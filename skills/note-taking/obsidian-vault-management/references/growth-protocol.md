@@ -6,6 +6,22 @@ domains, role changes. Every flow splits into **LLM steps**
 (filesystem + config + manifest writes — `roles.py` subcommands, tested). The
 agent guides; the script executes. Never improvise filesystem surgery.
 
+## Capabilities at a glance
+
+| Operation | Does | Reach for it when |
+|---|---|---|
+| `bind PROFILE [--new]` | attach a contributor (skill, SOUL, env, plugin) | a profile should join the vault |
+| `bind PROFILE --domain NAME [--config FILE]` | create `work/NAME/` + grant the owner | a new domain tree is needed |
+| `bind PROFILE --manager` | promote to manager (combined surface if already a contributor) | the vault needs a manager |
+| `unbind PROFILE [--domain NAME]` | revoke grants (commented out), remove SOUL block, uninstall skills | a profile or domain leaves |
+| `transfer PROFILE --to NEW [--domain NAME]` | hand the manager role or a domain off | the manager or owner changes |
+| `list` | show bindings: role, surface, domains | "who is bound, and how?" |
+
+Rule of thumb: **bind grows, unbind shrinks, transfer re-arranges, list
+inspects.** Every operation is `--dry-run`-able; `--manager` and `--domain`
+are mutually exclusive (managers hold no content grants). Full flows below;
+the traps are at the bottom.
+
 ## Who may do what
 
 | Action | Who | Grant basis |

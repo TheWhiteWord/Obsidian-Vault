@@ -30,7 +30,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--vault", help="Vault root path (required)")
     ap.add_argument("--role", choices=["bind", "unbind", "transfer", "list"],
-                    help="Role mutation action (\u00a74.5)")
+                    help=("bind: attach a profile (--new creates it; --manager "
+                          "promotes; --domain grants work/<NAME>/**) | unbind: "
+                          "detach (--domain unowns only) | transfer: hand the "
+                          "manager role or a domain off (--to NEW) | list: "
+                          "show current bindings"))
     ap.add_argument("profile", nargs="?", metavar="PROFILE",
                     help="Target profile (bind/unbind/transfer)")
     ap.add_argument("--to", metavar="NAME",
