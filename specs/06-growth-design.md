@@ -265,7 +265,7 @@ managers never hold content grants; `default` unbound-able with a warning;
 domain trees are never deleted by the layer; every write stays
 comment-preserving + idempotent + dry-run-capable.
 | Field suggestion, SOUL drafting, topic interpretation | LLM | agent, guided by references |
-| fs + config writes, grant lines, profile creation, manifest append | mechanical | `setup.py` `--role` subcommands |
+| fs + config writes, grant lines, profile creation, manifest append | mechanical | `roles.py` `--role` subcommands |
 | Everything auditable | mechanical | audit log + SOUL manifest |
 
 The agent is *aided through the process* (the user's ask): it knows the options at each stage, presents them, and executes mechanically — it does not improvise filesystem surgery.

@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-import setup as installer
+import vault_ops as installer
 
 BUNDLED = installer.BUNDLED_SKILL
 assert BUNDLED.is_dir(), "bundled skill missing — installer has nothing to overlay"

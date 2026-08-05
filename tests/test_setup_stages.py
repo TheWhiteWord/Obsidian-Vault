@@ -18,7 +18,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import setup as installer
 
-BUNDLED = installer.BUNDLED_SKILL
+from vault_ops import BUNDLED_SKILL, _grant_role, _role_skill  # noqa: E402
+
+BUNDLED = BUNDLED_SKILL
 assert BUNDLED.is_dir(), "bundled skill missing — installer has nothing to overlay"
 
 
@@ -111,11 +113,11 @@ class TestValidation:
 
 class TestAccumulation:
     def test_skill_roles(self):
-        assert installer._role_skill({"manager"}) == "manager"
-        assert installer._role_skill({"manager", "creative"}) == "combined"
-        assert installer._role_skill({"creative"}) == "contributor"
-        assert installer._role_skill({"system"}) == "contributor"
-        assert installer._role_skill({"system", "manager"}) == "combined"
+        assert _role_skill({"manager"}) == "manager"
+        assert _role_skill({"manager", "creative"}) == "combined"
+        assert _role_skill({"creative"}) == "contributor"
+        assert _role_skill({"system"}) == "contributor"
+        assert _role_skill({"system", "manager"}) == "combined"
 
     def test_assignments_map_accumulates(self):
         state = {"answers": {
@@ -139,7 +141,7 @@ class TestGrantRole:
         roles = tmp_path / "roles.yaml"
         roles.write_text("agents:\n  default:\n    read: [\"**\"]\n",
                          encoding="utf-8")
-        changed = installer._grant_role(roles, "bob", "creative")
+        changed = _grant_role(roles, "bob", "creative")
         assert changed
         text = roles.read_text(encoding="utf-8")
         assert "  bob:" in text
@@ -157,7 +159,7 @@ class TestGrantRole:
         roles.write_text(
             "agents:\n  default:\n    write: [\"system/**\"]\n"
             "    read: [\"**\"]\n", encoding="utf-8")
-        changed = installer._grant_role(roles, "default", "creative")
+        changed = _grant_role(roles, "default", "creative")
         assert changed
         text = roles.read_text(encoding="utf-8")
         assert '"system/**"' in text and '"work/creative/**"' in text
@@ -173,7 +175,7 @@ class TestGrantRole:
             "    config: [\"work/creative/**\"]\n"
             '    read: ["work/creative/**", "work/*/knowledge/**"]\n',
             encoding="utf-8")
-        changed = installer._grant_role(roles, "bob", "creative")
+        changed = _grant_role(roles, "bob", "creative")
         assert not changed
         assert '["work/creative/**"]' in roles.read_text(encoding="utf-8")
 
@@ -181,7 +183,7 @@ class TestGrantRole:
         roles = tmp_path / "roles.yaml"
         roles.write_text("agents:\n  default:\n    read: [\"**\"]\n",
                          encoding="utf-8")
-        changed = installer._grant_role(roles, "vault-manager", "manager")
+        changed = _grant_role(roles, "vault-manager", "manager")
         assert changed
         import yaml
         parsed = yaml.safe_load(roles.read_text(encoding="utf-8"))

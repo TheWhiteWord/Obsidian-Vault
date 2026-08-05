@@ -3,7 +3,7 @@
 How the manager grows the vault after installation: fresh setups, new
 contributors, new domains, role changes. Every flow splits into **LLM steps**
 (suggest fields, draft a SOUL — agent judgment) and **mechanical steps**
-(filesystem + config + manifest writes — `setup.py` subcommands, tested). The
+(filesystem + config + manifest writes — `roles.py` subcommands, tested). The
 agent guides; the script executes. Never improvise filesystem surgery.
 
 ## Who may do what
@@ -22,7 +22,7 @@ domain off, `list` inspects.
 ## Binding a contributor
 
 ```bash
-python3 scripts/setup.py --vault /path/to/vault --role bind PROFILE [--new]
+python3 scripts/roles.py --vault /path/to/vault --role bind PROFILE [--new]
 ```
 
 Binds an existing profile (or creates it with `--new`) as a contributor:
@@ -30,7 +30,7 @@ skill overlay, SOUL sections, seeded config, plugin enabled, `.env` bindings.
 A bare contributor holds **no content grants yet** — domains come next:
 
 ```bash
-python3 scripts/setup.py --vault /path/to/vault \
+python3 scripts/roles.py --vault /path/to/vault \
     --role bind PROFILE --domain DOMAIN [--config /path/to/domain.yaml]
 ```
 
@@ -44,7 +44,7 @@ already-scaffolded tree it grants only.
 ## Binding a manager
 
 ```bash
-python3 scripts/setup.py --vault /path/to/vault --role bind PROFILE --manager
+python3 scripts/roles.py --vault /path/to/vault --role bind PROFILE --manager
 ```
 
 `meta`/`config`/`read` on `**`, manager skill + manager SOUL. A contributor
@@ -55,11 +55,11 @@ dual-role SOUL block). Managers hold no content grants: `--manager` and
 ## Unbinding and transferring
 
 ```bash
-python3 scripts/setup.py --vault /path/to/vault --role unbind PROFILE
-python3 scripts/setup.py --vault /path/to/vault --role unbind PROFILE --domain DOMAIN
-python3 scripts/setup.py --vault /path/to/vault --role transfer PROFILE --to NEW
-python3 scripts/setup.py --vault /path/to/vault --role transfer PROFILE --to NEW --domain DOMAIN
-python3 scripts/setup.py --vault /path/to/vault --role list
+python3 scripts/roles.py --vault /path/to/vault --role unbind PROFILE
+python3 scripts/roles.py --vault /path/to/vault --role unbind PROFILE --domain DOMAIN
+python3 scripts/roles.py --vault /path/to/vault --role transfer PROFILE --to NEW
+python3 scripts/roles.py --vault /path/to/vault --role transfer PROFILE --to NEW --domain DOMAIN
+python3 scripts/roles.py --vault /path/to/vault --role list
 ```
 
 - `unbind` revokes grants (the block is commented out, deny-by-default —

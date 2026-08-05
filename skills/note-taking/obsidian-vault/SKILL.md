@@ -109,9 +109,10 @@ hand-create folders or configs.
    structural keys need user confirmation.
 2. No registration step — your grant covers `work/<domain>/**`, so the new
    folder is inside your domain from birth. The SOUL manifest entry (added
-   by `--role bind --domain`) already covers the domain's conventions. Only
-   a genuinely separate domain needs new grants — ask the manager
-   (`--role bind <you> --domain <name>` to add, `--role transfer <you>
+   by `scripts/roles.py --role bind --domain`) already covers the domain's
+   conventions. Only a genuinely separate domain needs new grants — ask the
+   manager (`scripts/roles.py --vault <vault> --role bind <you> --domain
+   <name>` to add, `scripts/roles.py --vault <vault> --role transfer <you>
    --to <other> --domain <name>` to hand it off).
 3. When the new folder's rules genuinely diverge from your main conventions,
    express them in its `.vault/config.yaml` (the scaffold delta) — the

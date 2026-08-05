@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-import setup as installer
+import vault_ops as installer
 
 from vault.grants import load_roles  # noqa: E402  (plugin root on sys.path via conftest)
 

@@ -56,17 +56,17 @@ After setup, the same script owns every post-install mutation via the
 
 ```bash
 # bind a contributor profile (--new creates it); --domain adds a domain
-python3 scripts/setup.py --vault <path> --role bind <NAME> [--new] [--domain <DOMAIN>] [--config <FILE>]
+python3 scripts/roles.py --vault <path> --role bind <NAME> [--new] [--domain <DOMAIN>] [--config <FILE>]
 # bind a manager (a contributor who becomes the manager gets the combined surface)
-python3 scripts/setup.py --vault <path> --role bind <NAME> --manager
+python3 scripts/roles.py --vault <path> --role bind <NAME> --manager
 # hand the manager role off (the successor is re-derived; the old manager
 # keeps any domains it owned)
-python3 scripts/setup.py --vault <path> --role transfer <NAME> --to <SUCCESSOR>
+python3 scripts/roles.py --vault <path> --role transfer <NAME> --to <SUCCESSOR>
 # unbind (grants commented out, SOUL block removed; trees stay — remove
 # manually if wanted). Refuses for the manager — transfer instead.
-python3 scripts/setup.py --vault <path> --role unbind <NAME>
+python3 scripts/roles.py --vault <path> --role unbind <NAME>
 # who is bound, with which role, surface, and domains
-python3 scripts/setup.py --vault <path> --role list
+python3 scripts/roles.py --vault <path> --role list
 ```
 
 The interactive reference for these flows:
@@ -92,8 +92,9 @@ Every subcommand supports `--dry-run`.
 .venv-test/bin/python -m pytest tests/ -q   # the suite (284 tests)
 ```
 
-Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire +
-growth · `skills/note-taking/obsidian-vault/` + `skills/note-taking/
+Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·
+`scripts/roles.py` daily role verbs · `scripts/vault_ops.py` shared core ·
+`skills/note-taking/obsidian-vault/` + `skills/note-taking/
 obsidian-vault-management/` the bundled skills (base + references +
 templates) · `examples/` starter/blank presets · `specs/` design history
 (model, decisions D1–D9, install, maintenance, growth, TASKS) ·

@@ -42,7 +42,7 @@ flow; re-running it after mutations re-binds per its answers ("start over").
 
 1. **Design doc** — 06-growth-design §4.5 (model, grammar, invariants,
    derivation rule). **DONE**
-2. **Mutation core in scripts/setup.py** — DONE:
+2. **Mutation core in scripts/vault_ops.py** — DONE:
    - `_revoke_globs` (exact-glob revocation; emptied kind lines dropped; an
      emptied block is COMMENTED OUT preserving the original text — the
      blank preset's deny-by-default stub style)
