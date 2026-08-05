@@ -753,9 +753,8 @@ Work that landed during P0–P2 but was not in the original trajectory:
   one with a field named `status`. Caught by the portability guard.
 - ☑ **Audit trail as JSONL** (`.state/audit-log.jsonl`) — append-only,
   crash-safe, concurrent-safe. Originally spec'd as a JSON array.
-- ☑ **Live vault seeded and exercised** — `/media/theww/AI/TWW/VAULT` has real
-  notes in `CREATIVE/PHILOSOPHY`, `CREATIVE/KNOWLEDGE`, `SYSTEM/KNOWLEDGE`,
-  `SYSTEM/HANDBOOK`, a working `.vault/roles.yaml`, generated INDEX/registry
+- ☑ **Live vault seeded and exercised** — the developer's live vault has
+  real notes, a working `.vault/roles.yaml`, generated INDEX/registry
   files, and an audit log written by the plugin itself.
 - ☑ **Plugin is enabled in Hermes** and its tools are registered through the
   real plugin loader + tool registry (verified end-to-end). Tools appear after

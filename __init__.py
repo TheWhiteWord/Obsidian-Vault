@@ -5,8 +5,6 @@ running Obsidian required, so maintenance can run headless from cron.
 
 This module is wiring only: resolve arguments, dispatch, serialise errors.
 All logic lives in ``vault/``.
-
-Spec: /media/theww/AI/TWW/DESK/specs/01-vault-v2-model.md
 """
 
 from __future__ import annotations
