@@ -22,10 +22,14 @@ domains).
 
 1. **`obsidian_context(folder)`** first — the resolved schema and your grants
    for the folder.
-2. **Sweep:** `obsidian_maintain` (delta / maintain / optimize) — findings
-   become ledger issues.
-3. **Triage:** `obsidian_issue_list` + `obsidian_audit` — anomalies and
-   unresolved findings.
+2. **Verify the vault** — both checks feed the ledger, nothing acts yet:
+   - **Sweep:** `obsidian_maintain` (delta / maintain / optimize) — findings
+     become ledger issues.
+   - **README drift check:** compare the orientation doc's Tree section
+     against the live vault. Drift → raise a `[maintenance]` issue targeted
+     at `README.md`.
+3. **Triage:** `obsidian_issue_list` + `obsidian_audit` — sweep findings,
+   README drift, and anomalies, newest first.
 4. **Act within your remit:** fix structure and metadata; escalate content
    judgments to the domain owner as ledger issues.
 
@@ -77,6 +81,7 @@ Load only what the task calls for; never load all references up front.
 ## Verification
 
 - [ ] Ran `obsidian_maintain` before triage (or know why not).
+- [ ] Checked the README's Tree section against the live vault — drift raised as an issue.
 - [ ] Triage covered the ledger and the audit trail.
 - [ ] Content judgments escalated as issues, not self-resolved.
 - [ ] AUTO actions applied within grants only.
@@ -84,6 +89,8 @@ Load only what the task calls for; never load all references up front.
 ## Pitfalls
 
 - Editing prose — your grants refuse it; raise an issue instead.
+- Editing the README body — you have no `write` over it; raise drift as an
+  issue for the system owner (`default`) to apply.
 - Hand-editing `roles.yaml` or config files — the growth subcommands and
   `obsidian_edit_config` exist.
 - Running the sweep with `dry_run` or `distribute: false` and forgetting the

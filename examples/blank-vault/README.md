@@ -4,59 +4,66 @@ kind: [note]
 status: active
 tags: [vault, orientation]
 created: "@today"
-description: Vault orientation — a bare vault, and how it grows.
+description: Vault orientation — a bare vault, who does what, and how it grows.
 ---
 # Blank vault (custom installation)
 
-A **bare** vault: the root schema and a deny-by-default roles file, with no
-domains yet. Domains are added when there is something to organise — by the
-manager, through the growth protocol.
+A **bare** vault: the rules exist, the content doesn't yet. There are no
+domains — they appear when there is something to organise. This file is for
+you: who to ask, and how the vault grows. The agents have their own
+instructions; you don't need to know any commands.
 
 ## Tree
 
 ```
 VAULT/
-├── .vault/
-│   ├── config.yaml        # root schema (five core fields) + conventions.skill
-│   └── roles.yaml         # `default` active; manager commented until created
-├── README.md              # this file
-└── (domains appear as work/<name>/ when the manager adds them)
+├── .vault/            # machinery: schema + who has access (leave alone)
+└── README.md          # this file
 ```
 
 No `system/`, no `work/` — those are the *standard* preset's shape.
 A blank vault starts empty and grows deliberately.
 
-## Who does what
+## Who does what — ask the right agent
 
-- `default` — system owner, reads everything; the only active agent until
-  the manager (or a contributor) is created.
-- **Manager** — to start using the vault, create a manager profile (or reuse
-  one) and give it the maintenance grants: `meta`/`config`/`read` on `**`.
-  The custom-install flow walks through this.
-- **Contributors** — created per domain, when a domain exists: each owns
-  `work/<domain>/**`, reads shared knowledge.
+| You want to… | The role that handles it |
+|---|---|
+| Create the first domain (and its contributor) | the **manager** |
+| Add another domain later | the **manager** |
+| Create or edit notes in a domain | that domain's **contributor** |
 
-## Growing the vault
+- **Until the first domain exists, one agent may play every role** — the
+  manager is created (or reused) when you're ready to grow.
+- **Contributors write only their own domain.** Once a domain exists, its
+  contributor owns it: creates and edits notes, adds subfolders.
+- **The manager maintains, it doesn't write prose.** It creates domains,
+  sweeps for problems, and changes rules, but never edits content.
+- **One profile can hold several roles.** A single-agent setup puts
+  everything on one profile — ask the same way; the agent knows its own
+  grants.
 
-- Add a domain (manager): name it, pick an existing profile or create one,
-  propose the field delta (e.g. `type.allowed_only: [recipe]` +
-  `source`/`retrieved` required), confirm, and the domain + profile + grants
-  + SOUL manifest entry are created.
-- Add a subdirectory (domain owner): `obsidian_scaffold` inside your own
-  tree — no manager round-trip needed.
-- Issues are ledger records under `.state/issues/` (spec 05) — invisible to
-  search/graph/INDEX, accessed only through `obsidian_issue*` tools.
+## How the vault stays healthy
 
-## Files
+Problems are tracked automatically as **issues** — records about the vault,
+kept apart from your notes. When something is wrong (a broken link, a stale
+index, a note missing a required field), the vault files it, and the agent
+that owns the affected folder is the one that fixes it.
 
-- `.vault/config.yaml` — minimal root schema: the five core fields,
-  defaults, tags mode, validation, `conventions.skill`.
-- `.vault/roles.yaml` — deny-by-default; only `default` active, manager
-  block commented until a manager exists.
-- `.state/issues/` — created on first use: the issue ledger.
+- Any agent can report a problem; the owner of the folder resolves it.
+- The manager runs a **maintenance sweep** every night (a full check on
+  Mondays) that catches problems before you notice them.
+- Ask the manager for a health report anytime — what's open, what's being
+  fixed, what's been declined.
 
-## Extending
+## Making changes
 
-The full flow is scripted: `scripts/setup.py` (plugin) runs the setup
-questionnaire (standard vs blank), installs the per-profile skill
-overlay, and writes these files.
+You almost never touch files or run commands yourself. Tell the right agent
+from the table above what you want, and it does the rest.
+
+This file stays in sync with the vault: the manager checks the tree against
+the live vault during the maintenance sweep and files an issue if it
+drifts; the agent that owns this file applies the update.
+
+Growing the vault is a manager conversation: you name a domain, say who
+should own it (an existing profile or a new one), and the manager creates
+the domain, the contributor's grants, and the conventions in one step.

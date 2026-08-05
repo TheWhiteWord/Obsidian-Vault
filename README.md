@@ -51,8 +51,10 @@ One-agent setups are allowed: assign every role to a single profile (e.g.
 
 ## Growing a live vault
 
-After setup, the same script owns every post-install mutation via the
-`--role` verb (bind / unbind / transfer / list, §4.5):
+**You don't run these yourself** — tell your Hermes agent what you want
+(e.g. "add a domain for recipes, owned by a new profile"), and it executes
+them for you, typically on the vault-manager profile. The commands below
+are the agent's grammar and your reference for what's possible:
 
 ```bash
 # bind a contributor profile (--new creates it); --domain adds a domain
@@ -89,7 +91,7 @@ Every subcommand supports `--dry-run`.
 ## Development
 
 ```bash
-.venv-test/bin/python -m pytest tests/ -q   # the suite (284 tests)
+.venv-test/bin/python -m pytest tests/ -q   # the suite (302 tests)
 ```
 
 Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·

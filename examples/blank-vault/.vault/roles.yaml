@@ -13,8 +13,15 @@ agents:
   # System owner — the default Hermes profile. The only agent with
   # `.hermes`-wide reach; uses the plugin as one tool among many. In a blank
   # vault with no domains yet, `default` is the only active agent.
+  #
+  # `system/**` is a STANDING permission, not a pre-created tree: the blank
+  # preset ships no folders (that is the standard preset's shape), and the
+  # engine materialises the tree on first write — or when the user's own
+  # tree includes it. Same standing nature as `read: ["**"]`.
+  # Also holds the vault-root README.md — the orientation doc is a system
+  # document, so the manager's README-drift findings have an owner.
   default:
-    write:  ["system/**"]
+    write:  ["system/**", "README.md"]
     read:   ["**"]
 
   # Manager — maintenance only. Structurally incapable of altering prose:

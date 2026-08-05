@@ -11,9 +11,12 @@
 agents:
   # System owner — the default Hermes profile. The only agent with
   # `.hermes`-wide reach; uses the plugin as one tool among many. Owns the
-  # system tree (handbook, logs, decisions), reads everything.
+  # system tree (handbook, logs, decisions), reads everything. Also holds
+  # the vault-root README.md — the orientation doc is a system document,
+  # so the manager's README-drift findings (maintenance loop step 5) have
+  # an owner who can apply them.
   default:
-    write:  ["system/**"]
+    write:  ["system/**", "README.md"]
     config: ["system/**"]
     read:   ["**"]
 

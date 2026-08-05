@@ -4,71 +4,67 @@ kind: [note]
 status: active
 tags: [vault, orientation]
 created: "@today"
-description: Vault orientation — layout, roles, and how the issue ledger works.
+description: Vault orientation — what's here, who does what, and how to ask for changes.
 ---
 # Starter vault — suggested layout (standard preset)
 
-A copyable example of the plugin's **convention layer** (D1/D3): mechanism is
-in the engine, this is one coherent named pattern offered at setup. Copy into
-a vault root and adapt — never checked by the engine.
+This vault is organised as a set of **domains** — folders owned by different
+agents, each with its own rules. This file is for you: what's here, who to
+ask, and how the vault stays healthy. The agents have their own
+instructions; you don't need to know any commands.
 
 ## Tree
 
 ```
 VAULT/
-├── .vault/
-│   ├── config.yaml        # root schema + conventions.skill pointer
-│   └── roles.yaml         # agents + grants
-├── system/                # owned by `default` (system-wide knowledge + records)
-│   ├── handbook/
-│   ├── logs/
-│   └── decisions/
-└── work/                  # container of domain vaults
-    ├── creative/          # owned by `creative` profile
-    │   ├── knowledge/     # shared: `creative` + `researcher`
-    │   └── projects/
-    └── coding/            # owned by `dev` profile
-        ├── knowledge/     # shared: `dev` + `researcher`
-        └── projects/
+├── .vault/            # machinery: schema + who has access (leave alone)
+├── system/            # system-wide knowledge and records (handbook, logs, decisions)
+└── work/              # the domains
+    ├── creative/      # creative work: knowledge/ + projects/
+    └── coding/        # coding work: knowledge/ + projects/
 ```
 
-Issues do **not** live in the tree: the issue layer is a ledger of structured
-records under `.state/issues/` (spec 05), invisible to search/graph/INDEX,
-accessed only through `obsidian_issue*` tools.
+## Who does what — ask the right agent
 
-## Roles (D8/D9)
+| You want to… | The role that handles it |
+|---|---|
+| Create or edit notes in a domain | that domain's **contributor** |
+| Add a new domain, or a new contributor | the **manager** |
+| Change vault-wide rules (schema, who has access) | the **manager** |
+| Fix something broken (broken link, stale index) | the **manager**, or the contributor who owns that folder |
 
-- `default` — owns `system/**`; the only profile with `.hermes`-wide reach.
-  Uses the plugin as one tool among many. Manager conventions appended to its
-  skill copy.
-- `vault-manager` — maintenance only: `meta`/`config`/`read` everywhere, no
-  prose write, no `.hermes` authority.
-- Domain contributors (`creative`, `dev`, ...) — own `work/<domain>/**`, read
-  `work/*/knowledge/**` (their own + all shared knowledge).
-- `researcher` — owns `work/*/knowledge/**`: provides research for every
-  domain; knowledge INDEXes are its maintainer's job.
+- **Contributors write only their own domain.** A note in one domain can't
+  be edited by another domain's contributor — ask the owner.
+- **The manager maintains, it doesn't write prose.** It restructures,
+  sweeps for problems, and changes rules, but never edits your content.
+- **One profile can hold several roles.** A single-agent setup puts
+  everything on one profile; a profile can be both manager and
+  contributor. Ask the same way — the agent knows its own grants.
+- **Reading is wider than writing.** Every agent reads more than it writes;
+  shared knowledge is readable across domains.
 
-> Glob note: knowledge folders sit two levels under the root
-> (`work/<domain>/knowledge/`), so the shared glob is `work/*/knowledge/**` —
-> the single-segment `*` (which does not cross separators) plus `**` (which
-> does).
+## How the vault stays healthy
 
-## Files
+Problems are tracked automatically as **issues** — records about the vault,
+kept apart from your notes. When something is wrong (a broken link, a stale
+index, a note missing a required field), the vault files it, and the agent
+that owns the affected folder is the one that fixes it.
 
-- `.vault/config.yaml` — root schema (five fields, defaults, tags mode,
-  validation, `paths.state`, `summary_field`, `conventions.skill`).
-- `.vault/roles.yaml` — the full standard agent set, all active: `default`
-  (system owner), `vault-manager` (maintenance only), and the domain
-  contributors `creative`, `dev`, `researcher` (D8/D9). The vault is built
-  for exactly these profiles, so nothing ships commented. Custom installs
-  with different profile sets are a future design consideration.
-- `.state/issues/` — created on first use: the issue ledger (records, not
-  notes; engine machinery, no config to copy).
+- Any agent can report a problem; the owner of the folder resolves it.
+- The manager runs a **maintenance sweep** every night (a full check on
+  Mondays) that catches problems before you notice them.
+- Ask the manager for a health report anytime — what's open, what's being
+  fixed, what's been declined.
 
-## Extending
+## Making changes
 
-- Add a domain: `obsidian_scaffold work/<name>/` → create the profile → add
-  the contributor's grant block to `roles.yaml` (copy the pattern from the
-  standard set) → generate `<name>-conventions.md` from the template.
-- The full flow is scripted: `scripts/setup.py` (plugin) runs the setup
-  questionnaire, composes the per-profile skill, and writes these files.
+You almost never touch files or run commands yourself. Tell the right agent
+from the table above what you want, and it does the rest — creating
+folders, updating indexes, keeping the rules consistent.
+
+This file stays in sync with the vault: the manager checks the tree against
+the live vault during the maintenance sweep and files an issue if it
+drifts; the agent that owns this file applies the update.
+
+A *new* domain (a new area of work with its own contributor) is a manager
+conversation: name it, say who should own it, and it's created.
