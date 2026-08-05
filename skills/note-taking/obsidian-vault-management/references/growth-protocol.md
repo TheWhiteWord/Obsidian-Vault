@@ -1,7 +1,7 @@
 # Growth protocol
 
-How the manager grows the vault after installation: fresh setups, new
-contributors, new domains, role changes. Every flow splits into **LLM steps**
+How the manager grows the vault after installation: new contributors, new
+domains, role changes. Every flow splits into **LLM steps**
 (suggest fields, draft a SOUL — agent judgment) and **mechanical steps**
 (filesystem + config + manifest writes — `roles.py` subcommands, tested). The
 agent guides; the script executes. Never improvise filesystem surgery.
@@ -78,41 +78,12 @@ python3 scripts/roles.py --vault /path/to/vault --role list
 - `default` is unbound-able (the skill stays reachable as
   `plugin:obsidian-vault`) — the operation warns.
 
-## Fresh setup (the questionnaire)
-
-The setup flow is a **deterministic stage machine** — the script owns every
-decision; the agent only relays:
-
-```bash
-python3 scripts/setup.py --setup                    # print the current question
-python3 scripts/setup.py --setup --answer <value>   # validate + build the stage
-python3 scripts/setup.py --setup --reset            # start over
-```
-
-Questions come back machine-readable (`SETUP:question` JSON); relay them
-in-chat and feed the user's answer back. An invalid answer loops back with
-`SETUP:alert` + the same question.
-
-Stages: **location** → **name** → **preset** (`standard`|`blank`) →
-per-role profile assignment → **finalize** (recap + state reset).
-
-- `standard` recreates the five-agent starter (manager, creative, dev,
-  researcher + the implicit `default` system owner); `blank` is a bare
-  deny-by-default vault.
-- Each role accepts `create` (canonical profile name), `default` (map the
-  role onto the default profile), or `existing:NAME`.
-- **Role accumulation:** several roles on one profile get both skills plus
-  unioned grants — one-agent setups are first-class.
-- The preset answer scaffolds the vault immediately; profile building
-  happens at finalize (accumulation needs all answers first).
-- Re-running the questionnaire after role mutations re-binds per its answers
-  — it is the "start over" flow, not a mutation tool.
-
-The agent's job is relay-only: no improvising prompts, no filesystem
-surgery, no invented stages — the script's question is the question.
-
 ## Pitfalls
 
+- **The questionnaire is install-time only** (`scripts/setup.py --setup`,
+  relayed by the human — the manager profile does not exist yet while it
+  runs). Re-running it after role mutations re-binds per its answers: a
+  start-over flow, not a mutation tool — use `--role`.
 - **Grants are the truth:** role/skill/SOUL derive from the live
   `roles.yaml` block; the SOUL block is the bind marker. Never hand-edit
   roles.yaml or the SOUL block — use `--role`.

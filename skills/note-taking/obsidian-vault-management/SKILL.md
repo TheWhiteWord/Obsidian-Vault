@@ -64,8 +64,9 @@ structure, metadata, and config; you never write prose.
   finding lifecycle, the schedule.
 - `references/issues.md` — the ledger: triage across the vault, resolve /
   decline, TTLs.
-- `references/growth-protocol.md` — the setup questionnaire and the `--role`
-  verb family (`bind` / `unbind` / `transfer` / `list`).
+- `references/growth-protocol.md` — the `--role` verb family
+  (`bind` / `unbind` / `transfer` / `list`) for post-install growth and
+  role changes.
 - `references/tool-protocol.md` — refusal semantics, enforcement order, scope
   globs.
 - `references/config-authoring.md` — the config DSL: merge rules,
