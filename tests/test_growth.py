@@ -198,12 +198,19 @@ def test_ensure_manager_grant_noop_on_starter(tmp_path):
     assert scaffolded.read_text(encoding="utf-8") == text
 
 
-# --- add_contributor -------------------------------------------------------
+# --- role_bind (P6, 06-growth-design §4.5) ---------------------------------
 
-def test_add_contributor_installs_overlay_and_soul(tmp_path):
+def _bound_contributor(hermes: Path, vault: Path, name: str) -> Path:
+    """Pre-create a profile and bind it as a bare contributor."""
+    profile = _profile_dir(hermes, name)
+    installer.role_bind(hermes, vault, name)
+    return profile
+
+
+def test_bind_new_profile_installs_overlay_and_soul(tmp_path):
     hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    installer.add_contributor(hermes, "creative", vault)
+    profile = _profile_dir(hermes, "creative")   # pre-created → CLI skipped
+    installer.role_bind(hermes, vault, "creative", new=True)
 
     target = profile / "skills" / "note-taking" / "obsidian-vault"
     assert (target / "SKILL.md").is_symlink()
@@ -211,31 +218,35 @@ def test_add_contributor_installs_overlay_and_soul(tmp_path):
     assert "## Vault" in soul_text
     assert "### Convention manifest" in soul_text
     assert "<vault>-conventions.md" in soul_text
-    assert "conventions/manager.md" not in soul_text
 
 
-def test_add_contributor_dry_run_creates_no_profile(tmp_path):
+def test_bind_existing_profile_without_new(tmp_path):
+    """The flagged gap (2026-08-05): a pre-existing profile can be bound."""
     hermes, vault = _scratch(tmp_path)
-    installer.add_contributor(hermes, "bob", vault, dry_run=True)
-    assert not (hermes / "profiles" / "bob").exists()
+    profile = _profile_dir(hermes, "bob")
+    installer.role_bind(hermes, vault, "bob")     # no --new
+    assert (profile / "skills" / "note-taking" / "obsidian-vault"
+            / "SKILL.md").is_symlink()
 
 
-# --- add_domain ------------------------------------------------------------
-
-def test_add_domain_full_flow(tmp_path):
+def test_bind_requires_profile_or_new(tmp_path):
     hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    installer.ensure_soul_sections(profile / "SOUL.md", "contributor")
+    with pytest.raises(FileNotFoundError, match="use --new"):
+        installer.role_bind(hermes, vault, "ghost")
 
-    installer.add_domain(hermes, vault, "recipes", "creative")
+
+def test_bind_domain_full_flow(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    profile = _bound_contributor(hermes, vault, "creative")
+
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
 
     # Tree + config.
     cfg = vault / "work" / "recipes" / ".vault" / "config.yaml"
     assert cfg.is_file()
     assert "work/recipes" in cfg.read_text(encoding="utf-8")
 
-    # Grant correctness through the engine — real operations: owner can
-    # create/edit/config inside, cannot reach root .vault/ or roles.yaml.
+    # Grant correctness through the engine — real operations.
     registry = load_roles(vault)
     assert registry.allows("creative", "create", "work/recipes/note.md")
     assert registry.allows("creative", "edit", "work/recipes/note.md")
@@ -252,109 +263,368 @@ def test_add_domain_full_flow(tmp_path):
     assert "recipes domain conventions (work/recipes/**)" in soul_text
 
     # Idempotent re-run: no duplicate manifest entry, no double grant.
-    installer.add_domain(hermes, vault, "recipes", "creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
     soul_text2 = (profile / "SOUL.md").read_text(encoding="utf-8")
     assert soul_text2.count("recipes domain conventions") == 1
-    assert load_roles(vault).allows("creative", "create", "work/recipes/note.md")
+    assert load_roles(vault).allows("creative", "create",
+                                    "work/recipes/note.md")
 
 
-def test_add_domain_custom_config_file(tmp_path):
+def test_bind_domain_on_existing_tree_grants_only(tmp_path):
+    """bind --domain on an already-scaffolded tree = grant + manifest."""
     hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "dev")
-    installer.ensure_soul_sections(profile / "SOUL.md", "contributor")
+    profile = _bound_contributor(hermes, vault, "creative")
+    (vault / "work" / "notes").mkdir(parents=True)   # pre-existing tree
+
+    installer.role_bind(hermes, vault, "creative", domain="notes")
+    assert load_roles(vault).allows("creative", "create", "work/notes/a.md")
+    soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
+    assert "notes domain conventions (work/notes/**)" in soul_text
+
+
+def test_bind_domain_custom_config_file(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "dev")
 
     cfg_file = tmp_path / "recipes.yaml"
     cfg_file.write_text("fields:\n  type:\n    allowed: [recipe, test]\n",
                         encoding="utf-8")
-    installer.add_domain(hermes, vault, "recipes", "dev",
-                         config_file=str(cfg_file))
+    installer.role_bind(hermes, vault, "dev", domain="recipes",
+                        config_file=str(cfg_file))
     written = (vault / "work" / "recipes" / ".vault" / "config.yaml"
                ).read_text(encoding="utf-8")
     assert "allowed: [recipe, test]" in written
 
 
-def test_add_domain_refuses_broken_config(tmp_path):
+def test_bind_domain_refuses_broken_config(tmp_path):
     hermes, vault = _scratch(tmp_path)
-    _profile_dir(hermes, "dev")
+    _bound_contributor(hermes, vault, "dev")
     cfg_file = tmp_path / "bad.yaml"
     cfg_file.write_text("fields: [unclosed\n", encoding="utf-8")
     with pytest.raises(Exception):
-        installer.add_domain(hermes, vault, "recipes", "dev",
-                             config_file=str(cfg_file))
+        installer.role_bind(hermes, vault, "dev", domain="recipes",
+                            config_file=str(cfg_file))
 
 
-def test_add_domain_requires_scaffolded_vault_and_owner(tmp_path):
-    hermes, vault = _scratch(tmp_path, with_vault=False)
-    with pytest.raises(FileNotFoundError, match="scaffold the vault first"):
-        installer.add_domain(hermes, vault, "recipes", "dev")
-
-    hermes2, vault2 = _scratch(tmp_path / "b")
-    with pytest.raises(FileNotFoundError, match="does not exist"):
-        installer.add_domain(hermes2, vault2, "recipes", "dev")
-
-
-def test_add_domain_dry_run_writes_nothing(tmp_path):
+def test_bind_refuses_manager_flag_with_domain(tmp_path):
     hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    installer.ensure_soul_sections(profile / "SOUL.md", "contributor")
-
-    installer.add_domain(hermes, vault, "recipes", "creative", dry_run=True)
-    assert not (vault / "work" / "recipes").exists()
-    assert "recipes domain conventions" not in (
-        profile / "SOUL.md").read_text(encoding="utf-8")
+    _profile_dir(hermes, "bob")
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        installer.role_bind(hermes, vault, "bob", manager_role=True,
+                            domain="recipes")
 
 
-# --- add_subdomain ---------------------------------------------------------
-
-def _owner_seeded(vault: Path, owner: str, domain: str) -> None:
-    """Seed the owner's grant over work/<domain>/** — the state that exists
-    before a subdomain is scaffolded (the owner was added via --add-domain)."""
-    installer._append_agent_grant(vault / ".vault" / "roles.yaml",
-                                  owner, domain)
-
-
-def test_add_subdomain_rides_scaffold_and_records_manifest(tmp_path):
+def test_bind_domain_refused_on_manager_profile(tmp_path):
     hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    installer.ensure_soul_sections(profile / "SOUL.md", "contributor")
-    _owner_seeded(vault, "creative", "creative")
+    profile = _profile_dir(hermes, "bob")
+    installer.role_bind(hermes, vault, "bob", manager_role=True)
+    assert "### Convention manifest" not in (
+        profile / "SOUL.md").read_text(encoding="utf-8")   # manager SOUL
+    with pytest.raises(ValueError, match="managers hold no content grants"):
+        installer.role_bind(hermes, vault, "bob", domain="recipes")
 
-    # The tool's side: a scaffolded subdirectory inside the owner's domain.
-    (vault / "work" / "creative" / "recipes").mkdir(parents=True)
 
-    installer.add_subdomain(hermes, vault, "work/creative/recipes", "creative")
+def test_bind_manager_grants_and_soul(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+
+    registry = load_roles(vault)
+    assert registry.allows("vault-manager", "edit_meta", "system/x.md")
+    assert registry.allows("vault-manager", "edit_config",
+                           ".vault/config.yaml")
     soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert "work/creative/recipes conventions" in soul_text
+    assert "obsidian-vault-management" in soul_text      # manager surface
+    assert "### Convention maintenance" not in soul_text  # manager: none
 
 
-def test_add_subdomain_requires_existing_dir(tmp_path):
+def test_bind_manager_on_contributor_becomes_combined(tmp_path):
+    """A contributor who becomes the manager gets the combined surface."""
     hermes, vault = _scratch(tmp_path)
-    _profile_dir(hermes, "creative")
-    with pytest.raises(FileNotFoundError, match="run obsidian_scaffold first"):
-        installer.add_subdomain(hermes, vault, "work/creative/recipes",
-                                "creative")
+    profile = _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="creative")
+
+    installer.role_bind(hermes, vault, "creative", manager_role=True)
+    skills = profile / "skills" / "note-taking"
+    assert (skills / "obsidian-vault" / "SKILL.md").is_symlink()
+    assert (skills / "obsidian-vault-management" / "SKILL.md").is_symlink()
+    soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
+    assert "Dual role" in soul_text                     # combined variant
+    registry = load_roles(vault)
+    assert registry.allows("creative", "edit_meta", "system/x.md")
+    assert registry.allows("creative", "create", "work/creative/note.md")
 
 
-def test_add_subdomain_refuses_non_owner(tmp_path):
+def test_bind_dry_run_writes_nothing(tmp_path):
     hermes, vault = _scratch(tmp_path)
-    _profile_dir(hermes, "creative")
-    _profile_dir(hermes, "dev")
-    _owner_seeded(vault, "creative", "creative")
-    (vault / "work" / "creative" / "recipes").mkdir(parents=True)
-
-    # dev has no write over creative's tree.
-    with pytest.raises(PermissionError, match="holds no write"):
-        installer.add_subdomain(hermes, vault, "work/creative/recipes", "dev")
+    _profile_dir(hermes, "bob")
+    installer.role_bind(hermes, vault, "bob", domain="recipes", dry_run=True)
+    assert not (vault / "work" / "recipes").exists()
+    assert not (vault / ".vault" / "roles.yaml").read_text(
+        encoding="utf-8").count("bob:")
 
 
-def test_add_subdomain_dry_run_writes_nothing(tmp_path):
+# --- remove_soul_sections --------------------------------------------------
+
+def test_remove_soul_sections_removes_block_keeps_rest(tmp_path):
     hermes, vault = _scratch(tmp_path)
     profile = _profile_dir(hermes, "creative")
     installer.ensure_soul_sections(profile / "SOUL.md", "contributor")
-    _owner_seeded(vault, "creative", "creative")
-    (vault / "work" / "creative" / "recipes").mkdir(parents=True)
+    soul = profile / "SOUL.md"
+    text = soul.read_text(encoding="utf-8")
+    assert installer.SOUL_ANCHOR in text
 
-    installer.add_subdomain(hermes, vault, "work/creative/recipes", "creative",
-                            dry_run=True)
-    assert "work/creative/recipes conventions" not in (
-        profile / "SOUL.md").read_text(encoding="utf-8")
+    # user content after the block must survive
+    soul.write_text(text + "\n## Personal\n- keep me\n", encoding="utf-8")
+    assert installer.remove_soul_sections(soul) is True
+    rest = soul.read_text(encoding="utf-8")
+    assert installer.SOUL_ANCHOR not in rest
+    assert "## Personal" in rest
+    assert "keep me" in rest
+
+    assert installer.remove_soul_sections(soul) is False  # idempotent
+
+
+# --- role_unbind -----------------------------------------------------------
+
+def test_unbind_full_revokes_and_cleans(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    profile = _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    _profile_dir(hermes, "vault-manager")   # manager must exist
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    soul = profile / "SOUL.md"
+    env = profile / ".env"
+    env.write_text(f"OBSIDIAN_VAULT_PATH={vault}\nOTHER=x\n"
+                   f"OBSIDIAN_VAULT_AGENT=creative\n", encoding="utf-8")
+
+    installer.role_unbind(hermes, vault, "creative")
+
+    roles_text = (vault / ".vault" / "roles.yaml").read_text(
+        encoding="utf-8")
+    assert "# creative:" in roles_text          # commented, deny-by-default
+    assert "  creative:" not in roles_text      # no active block
+    registry = load_roles(vault)
+    assert not registry.allows("creative", "create", "work/recipes/a.md")
+    assert installer.SOUL_ANCHOR not in soul.read_text(encoding="utf-8")
+    assert not (profile / "skills" / "note-taking" / "obsidian-vault"
+                / "SKILL.md").is_symlink()
+    assert not (profile / "skills" / "note-taking").exists()
+    env_text = env.read_text(encoding="utf-8")
+    assert "OBSIDIAN_VAULT_PATH" not in env_text
+    assert "OTHER=x" in env_text                # other env preserved
+    # the manager is untouched
+    assert load_roles(vault).allows("vault-manager", "edit_meta",
+                                    "system/x.md")
+
+
+def test_unbind_refuses_manager(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    with pytest.raises(ValueError, match="must keep a manager"):
+        installer.role_unbind(hermes, vault, "vault-manager")
+
+
+def test_unbind_domain_unowns_keeps_tree(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    profile = _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    installer.role_bind(hermes, vault, "creative", domain="notes")
+    tree = vault / "work" / "recipes"
+    assert tree.is_dir()
+
+    installer.role_unbind(hermes, vault, "creative", domain="recipes")
+
+    assert tree.is_dir()                        # tree kept + notice
+    registry = load_roles(vault)
+    assert not registry.allows("creative", "create", "work/recipes/a.md")
+    assert registry.allows("creative", "create", "work/notes/a.md")
+    soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
+    assert "recipes domain conventions" not in soul_text
+    assert "notes domain conventions" in soul_text
+    assert installer.SOUL_ANCHOR in soul_text   # SOUL untouched
+
+
+def test_unbind_domain_nothing_held(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "creative")
+    with pytest.raises(ValueError, match="holds no grants under"):
+        installer.role_unbind(hermes, vault, "creative", domain="recipes")
+
+
+def test_unbind_domain_allowed_on_combined_manager(tmp_path):
+    """A manager who ALSO owns a domain (combined) may unown it — the
+    refusal is reserved for PURE managers (regression from the E2E)."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _bound_contributor(hermes, vault, "dev")
+    installer.role_bind(hermes, vault, "dev", domain="coding")
+    installer.role_bind(hermes, vault, "dev", manager_role=True)  # combined
+    assert (vault / "work" / "coding").is_dir()
+
+    installer.role_unbind(hermes, vault, "dev", domain="coding")
+
+    registry = load_roles(vault)
+    assert not registry.allows("dev", "create", "work/coding/x.md")
+    assert registry.allows("dev", "edit_meta", "system/x.md")  # still manager
+    assert installer.SOUL_ANCHOR in (profile / "SOUL.md").read_text(
+        encoding="utf-8")
+
+
+def test_unbind_domain_refused_on_pure_manager(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    with pytest.raises(ValueError, match="pure manager"):
+        installer.role_unbind(hermes, vault, "vault-manager",
+                              domain="recipes")
+
+
+def test_unbind_default_warns(tmp_path, capsys):
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "default")
+    installer.role_bind(hermes, vault, "default")
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+
+    installer.role_unbind(hermes, vault, "default")
+    out = capsys.readouterr().out
+    assert "default was the system owner" in out
+    assert not (profile / "skills" / "note-taking").exists()
+
+
+def test_unbind_dry_run_writes_nothing(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    profile = _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    soul = profile / "SOUL.md"
+    before = soul.read_text(encoding="utf-8")
+
+    installer.role_unbind(hermes, vault, "creative", dry_run=True)
+    assert soul.read_text(encoding="utf-8") == before
+    assert "  creative:" in (vault / ".vault" / "roles.yaml").read_text(
+        encoding="utf-8")
+
+
+# --- role_transfer ---------------------------------------------------------
+
+def test_transfer_manager_handoff_combined(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    profile = _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="creative")
+
+    installer.role_transfer(hermes, vault, "vault-manager", "creative")
+
+    registry = load_roles(vault)
+    assert registry.allows("creative", "edit_meta", "system/x.md")
+    assert registry.allows("creative", "create", "work/creative/a.md")
+    assert not registry.allows("vault-manager", "edit_meta", "system/x.md")
+    assert "  vault-manager:" not in (vault / ".vault" / "roles.yaml"
+                                      ).read_text(encoding="utf-8")
+    # creative: combined surface; old manager: fully unbound
+    skills = profile / "skills" / "note-taking"
+    assert (skills / "obsidian-vault" / "SKILL.md").is_symlink()
+    assert (skills / "obsidian-vault-management" / "SKILL.md").is_symlink()
+    assert "Dual role" in (profile / "SOUL.md").read_text(encoding="utf-8")
+    old_home = installer.profile_home(hermes, "vault-manager")
+    assert installer.SOUL_ANCHOR not in (old_home / "SOUL.md").read_text(
+        encoding="utf-8")
+    assert not (old_home / "skills" / "note-taking").exists()
+
+
+def test_transfer_manager_handoff_demotes_source_to_contributor(tmp_path):
+    """A manager who also owns a domain keeps the contributor surface."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _bound_contributor(hermes, vault, "bob")
+    installer.role_bind(hermes, vault, "bob", domain="recipes")
+    installer.role_bind(hermes, vault, "bob", manager_role=True)  # combined
+    _profile_dir(hermes, "carol")
+    installer.role_bind(hermes, vault, "carol")   # bare contributor
+
+    installer.role_transfer(hermes, vault, "bob", "carol")
+
+    registry = load_roles(vault)
+    assert not registry.allows("bob", "edit_meta", "system/x.md")
+    assert registry.allows("bob", "create", "work/recipes/a.md")
+    assert registry.allows("carol", "edit_meta", "system/x.md")
+    # bob: back to contributor surface (manager skill symlinks removed)
+    skills = profile / "skills" / "note-taking"
+    assert (skills / "obsidian-vault" / "SKILL.md").is_symlink()
+    assert not (skills / "obsidian-vault-management" / "SKILL.md").exists()
+    soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
+    assert "### Convention maintenance" in soul_text   # contributor block
+    assert "Dual role" not in soul_text
+    # carol: manager surface
+    carol = installer.profile_home(hermes, "carol")
+    assert "obsidian-vault-management" in (carol / "SOUL.md").read_text(
+        encoding="utf-8")
+
+
+def test_transfer_domain_moves_ownership_and_manifest(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    a = _bound_contributor(hermes, vault, "alice")
+    installer.role_bind(hermes, vault, "alice", domain="recipes")
+    b = _bound_contributor(hermes, vault, "bob")
+
+    installer.role_transfer(hermes, vault, "alice", "bob", domain="recipes")
+
+    registry = load_roles(vault)
+    assert not registry.allows("alice", "create", "work/recipes/a.md")
+    assert registry.allows("bob", "create", "work/recipes/a.md")
+    assert (vault / "work" / "recipes").is_dir()        # tree untouched
+    assert "recipes domain conventions" not in (a / "SOUL.md").read_text(
+        encoding="utf-8")
+    assert "recipes domain conventions" in (b / "SOUL.md").read_text(
+        encoding="utf-8")
+
+
+def test_transfer_refuses_non_manager_without_domain(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "alice")
+    _bound_contributor(hermes, vault, "bob")
+    with pytest.raises(ValueError, match="not the manager"):
+        installer.role_transfer(hermes, vault, "alice", "bob")
+
+
+def test_transfer_same_profile_refused(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "alice")
+    with pytest.raises(ValueError, match="same profile"):
+        installer.role_transfer(hermes, vault, "alice", "alice")
+
+
+def test_transfer_domain_on_manager_refused(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    _bound_contributor(hermes, vault, "bob")
+    with pytest.raises(ValueError, match="--domain transfer"):
+        installer.role_transfer(hermes, vault, "vault-manager", "bob",
+                                domain="recipes")
+
+
+def test_transfer_requires_existing_target(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    with pytest.raises(FileNotFoundError, match="bind it first"):
+        installer.role_transfer(hermes, vault, "vault-manager", "ghost")
+
+
+# --- role_list -------------------------------------------------------------
+
+def test_role_list_shows_bindings(tmp_path, capsys):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+
+    installer.role_list(hermes, vault)
+    out = capsys.readouterr().out
+    assert "manager: vault-manager" in out
+    assert "creative: role=contributor" in out
+    assert "domains=['recipes']" in out
+    assert "soul=yes" in out

@@ -1084,118 +1084,512 @@ def _ensure_manager_grant(roles_path: Path, manager: str,
     return True
 
 
-def add_contributor(hermes_home: Path, name: str, vault_root: Path,
-                    dry_run: bool = False) -> None:
-    """Growth (manager): create a contributor profile bound to the vault.
+# --- role mutation (P6, 06-growth-design §4.5) ------------------------------
+#
+# Grants are the truth: a profile's role is derived from its live roles.yaml
+# block (active meta/config/read-`**` ⇒ manager; any write/append globs ⇒
+# contributor; both ⇒ combined; none ⇒ unbound). The SOUL block is the bind
+# marker. Every write here is comment-preserving, idempotent, dry-run-aware.
 
-    Profile (if missing) + skill overlay + SOUL sections + config seed +
-    plugin enable + env — the same per-contributor steps as the interactive
-    install (extracted so the growth protocol and the installer share one
-    code path, thin entry points).
+def _active_agent_names(roles_path: Path) -> list[str]:
+    """Profile names with an ACTIVE (non-commented) grant block."""
+    import re as _re
+    text = roles_path.read_text(encoding="utf-8")
+    return _re.findall(r"(?m)^  ([a-zA-Z0-9_-]+):\s*$", text)
+
+
+def _block_span(lines: list[str], profile: str) -> tuple[int, int]:
+    """(start, end) line span of a profile's grant block.
+
+    The block is its two-space header plus ``    kind:`` lines; the first
+    non-blank line that is neither ends it (a sibling comment or the next
+    agent key). StopIteration when the profile has no active block.
     """
-    if dry_run:
-        if not profile_home(hermes_home, name).is_dir():
-            print(f"[dry-run] hermes profile create {name}")
-        print(f"[dry-run] install skill overlay + SOUL sections for {name}")
-        print(f"[dry-run] seed config + enable plugin + env for {name}")
-        return
-    contrib_skills = profile_home(hermes_home, name) / "skills"
-    if not profile_home(hermes_home, name).is_dir():
-        _create_profile(name, "Vault contributor")
-    install_skills(contrib_skills, role="contributor")
-    soul = profile_home(hermes_home, name) / "SOUL.md"
-    ensure_soul_sections(soul, "contributor")
-    seed_profile_config(hermes_home, name)
-    enable_plugin_for_profile(hermes_home, name, vault_root)
+    import re as _re
+    start = next(i for i, ln in enumerate(lines)
+                 if _re.match(rf"^  {_re.escape(profile)}:\s*$", ln))
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        ln = lines[i]
+        if not ln.strip():
+            continue
+        if _re.match(r"^    [a-zA-Z0-9_-]+:", ln):
+            continue
+        end = i
+        break
+    return start, end
 
 
-def add_domain(hermes_home: Path, vault_root: Path, domain: str,
-               owner: str, config_file: str = "",
-               dry_run: bool = False) -> None:
-    """Growth (manager): a full new domain ``work/<domain>/``.
+def _block_text(roles_path: Path, profile: str) -> str:
+    """Raw text of a profile's active grant block ('' when none)."""
+    try:
+        lines = roles_path.read_text(encoding="utf-8").splitlines(keepends=True)
+        start, end = _block_span(lines, profile)
+        return "".join(lines[start:end])
+    except (FileNotFoundError, StopIteration):
+        return ""
 
-    Tree + .vault/config.yaml + roles.yaml grant for the owner + the
-    owner's maintained conventions file + SOUL manifest entry (06-growth-
-    design §4.2). The owner profile must already exist (--add-contributor).
+
+def _manager_profile(roles_path: Path) -> str | None:
+    """The profile holding the active manager block (meta: ["**"])."""
+    import re as _re
+    if not roles_path.is_file():
+        return None
+    for name in _active_agent_names(roles_path):
+        if _re.search(r"^    meta:\s*\[\"\*\*\"\]",
+                      _block_text(roles_path, name), _re.M):
+            return name
+    return None
+
+
+def _roles_from_grants(roles_path: Path, profile: str) -> set[str]:
+    """Derive a profile's vault roles from its live grant block (§4.5)."""
+    import re as _re
+    block = _block_text(roles_path, profile)
+    if not block:
+        return set()
+    roles: set[str] = set()
+    if _re.search(r"^    meta:\s*\[\"\*\*\"\]", block, _re.M):
+        roles.add("manager")
+    if _re.search(r"^    (write|append):", block, _re.M):
+        roles.add("contributor")
+    return roles
+
+
+def _revoke_globs(roles_path: Path, profile: str,
+                  pairs: list[tuple[str, list[str]]],
+                  dry_run: bool = False) -> bool:
+    """Remove (kind, globs) from a profile's grant block.
+
+    The mutation core (§4.5): exact-glob removal per kind line; kind lines
+    that empty are dropped; a block left with no kind lines is COMMENTED
+    OUT (comment-preserving, deny-by-default — the blank preset's manager
+    stub pattern; the text survives for re-binding). Idempotent.
     """
+    import re as _re
     import yaml
-
-    root_cfg = vault_root / ".vault" / "config.yaml"
-    if not root_cfg.is_file():
-        raise FileNotFoundError(
-            f"{root_cfg} missing — scaffold the vault first")
-    owner_home = profile_home(hermes_home, owner)
-    if not owner_home.is_dir():
-        raise FileNotFoundError(
-            f"profile '{owner}' does not exist — create it first "
-            f"(--add-contributor {owner})")
-
-    domain_dir = vault_root / "work" / domain
+    if not roles_path.is_file():
+        raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
+    lines = roles_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    try:
+        start, end = _block_span(lines, profile)
+    except StopIteration:
+        return False  # no active block — nothing to revoke
+    orig_block = lines[start:end]
+    wanted = {kind: set(globs) for kind, globs in pairs}
+    changed = False
+    for i in range(start, end):
+        m = _re.match(r"^    ([a-zA-Z0-9_-]+):\s*\[(.*?)\]\s*$",
+                      lines[i].strip("\n"))
+        if not m or m.group(1) not in wanted:
+            continue
+        globs = _re.findall(r'"([^"]+)"', m.group(2))
+        keep = [g for g in globs if g not in wanted[m.group(1)]]
+        if len(keep) != len(globs):
+            lines[i] = f"    {m.group(1)}: {_fmt_globs(keep)}\n"
+            changed = True
+    if not changed:
+        return False
     if dry_run:
-        print(f"[dry-run] mkdir {domain_dir} + .vault/config.yaml")
-    else:
-        (domain_dir / ".vault").mkdir(parents=True, exist_ok=True)
-        if config_file:
-            cfg = Path(config_file)
-            if not cfg.is_file():
-                raise FileNotFoundError(f"config file not found: {cfg}")
-            raw = cfg.read_text(encoding="utf-8")
-            yaml.safe_load(raw)  # refuse to ship broken YAML
-            (domain_dir / ".vault" / "config.yaml").write_text(
-                raw, encoding="utf-8")
+        print(f"[dry-run] roles.yaml − revoke from {profile}: {pairs}")
+        return True
+    # drop emptied kind lines
+    out: list[str] = []
+    kept_kind = False
+    for i, ln in enumerate(lines):
+        if start <= i < end:
+            if _re.match(r"^    [a-zA-Z0-9_-]+:\s*\[\]", ln):
+                continue  # emptied kind line
+            if _re.match(r"^    [a-zA-Z0-9_-]+:", ln):
+                kept_kind = True
+            out.append(ln)
         else:
-            (domain_dir / ".vault" / "config.yaml").write_text(
-                _domain_config_stub(domain), encoding="utf-8")
+            out.append(ln)
+    if not kept_kind:
+        # block emptied — comment it out, preserving the ORIGINAL text
+        # (deny-by-default stub, the blank preset's manager style)
+        out = []
+        for i, ln in enumerate(lines):
+            if start <= i < end:
+                orig_ln = orig_block[i - start]
+                out.append(("  # " + orig_ln.lstrip()) if orig_ln.strip()
+                           else orig_ln)
+            else:
+                out.append(ln)
+    text = "".join(out)
+    yaml.safe_load(text)  # never ship broken YAML
+    roles_path.write_text(text, encoding="utf-8")
+    return True
 
-    roles = vault_root / ".vault" / "roles.yaml"
-    _append_agent_grant(roles, owner, domain, dry_run=dry_run)
 
-    owner_skills = owner_home / "skills"
-    ensure_conventions_file(owner_skills, vault_root, dry_run=dry_run)
-    line = (f"- `conventions/{vault_conventions_name(vault_root)}` — "
-            f"{domain} domain conventions (work/{domain}/**)")
-    append_manifest_entry(owner_home / "SOUL.md", line, dry_run=dry_run)
+def _domain_owned_globs(roles_path: Path, profile: str,
+                        domain: str) -> list[tuple[str, list[str]]]:
+    """Globs a profile actually holds under ``work/<domain>/``, by kind."""
+    import re as _re
+    prefix = f"work/{domain}/"
+    block = _block_text(roles_path, profile)
+    pairs: list[tuple[str, list[str]]] = []
+    for m in _re.finditer(r"(?m)^    ([a-zA-Z0-9_-]+):\s*\[(.*?)\]",
+                          block):
+        kind, raw = m.group(1), m.group(2)
+        owned = [g for g in _re.findall(r'"([^"]+)"', raw)
+                 if g.startswith(prefix)]
+        if owned:
+            pairs.append((kind, owned))
+    return pairs
 
 
-def add_subdomain(hermes_home: Path, vault_root: Path, rel_path: str,
-                  owner: str, dry_run: bool = False) -> None:
-    """Growth (owner): register a scaffolded subdomain in the SOUL manifest.
+def remove_soul_sections(soul_path: Path) -> bool:
+    """Remove the anchored ``## Vault`` block from a profile SOUL.
 
-    Rides ``obsidian_scaffold`` — the tool (write-gated) creates the
-    directory + config delta + INDEX; this subcommand only records the
-    subdomain in the owner's Convention manifest. Verifies the directory
-    exists and the owner holds write over it (roles.yaml) — the same grant
-    the tool enforced, checked again mechanically.
+    The block starts at the vault-soul anchor comment and ends at the next
+    level-1 heading (or EOF); a preceding blank separator is collapsed.
+    Returns True if anything was removed.
     """
-    from vault import grants
+    import re as _re
+    if not soul_path.is_file():
+        return False
+    text = soul_path.read_text(encoding="utf-8")
+    idx = text.find(SOUL_ANCHOR)
+    if idx == -1:
+        return False
+    line_start = text.rfind("\n", 0, idx) + 1
+    rest = text[line_start:]
+    # skip the anchor line, then the block's own `## Vault` heading; the
+    # block ends at the NEXT level-1 heading (or EOF).
+    after_anchor = rest[rest.find("\n") + 1:]
+    m1 = _re.search(r"(?m)^## [^#]", after_anchor)
+    end = len(text)
+    if m1:
+        m2 = _re.search(r"(?m)^## [^#]", after_anchor[m1.end():])
+        if m2:
+            end = line_start + (rest.find("\n") + 1) + m1.end() + m2.start()
+    head = text[:line_start]
+    if head.endswith("\n\n"):
+        head = head[:-1]
+    new_text = head + text[end:]
+    if new_text == text:
+        return False
+    soul_path.write_text(new_text, encoding="utf-8")
+    return True
 
-    target = vault_root / rel_path
-    if not target.is_dir():
+
+def uninstall_skills(profile_skills: Path, vault_root: Path) -> None:
+    """Remove a profile's vault skill overlay + this vault's conventions file.
+
+    Symlink surfaces (SKILL.md, references/, templates/) are unlinked for
+    both role skills; real copy-on-write content is preserved; the
+    maintained conventions file for THIS vault is removed; empty dirs are
+    pruned up the chain.
+    """
+    conv_name = vault_conventions_name(vault_root)
+    for name in ("obsidian-vault", "obsidian-vault-management"):
+        target = profile_skills / "note-taking" / name
+        if not target.is_dir():
+            continue
+        for sub in ("SKILL.md", "references", "templates"):
+            link = target / sub
+            if link.is_symlink():
+                link.unlink()
+        conv_file = target / "conventions" / conv_name
+        if conv_file.is_file():
+            conv_file.unlink()
+        conv_dir = target / "conventions"
+        if conv_dir.is_dir() and not any(conv_dir.iterdir()):
+            conv_dir.rmdir()
+        if not any(target.iterdir()):
+            target.rmdir()
+    root = profile_skills / "note-taking"
+    if root.is_dir() and not any(root.iterdir()):
+        root.rmdir()
+
+
+def remove_profile_env(prof_home: Path) -> bool:
+    """Drop the vault env vars from a profile .env (unbind)."""
+    env_path = prof_home / ".env"
+    if not env_path.is_file():
+        return False
+    before = env_path.read_text(encoding="utf-8")
+    lines = [ln for ln in before.splitlines()
+             if not ln.startswith(("OBSIDIAN_VAULT_PATH=",
+                                   "OBSIDIAN_VAULT_AGENT="))]
+    after = "\n".join(lines) + ("\n" if lines else "")
+    if after == before:
+        return False
+    env_path.write_text(after, encoding="utf-8")
+    return True
+
+
+def remove_manifest_entries(soul_path: Path, pattern: str,
+                            dry_run: bool = False) -> int:
+    """Remove convention-manifest lines matching a regex (unown --domain).
+
+    Lines above the ``<!-- add:`` marker matching ``pattern`` are deleted;
+    the marker and all other SOUL content are preserved. Returns count.
+    """
+    import re as _re
+    if not soul_path.is_file():
+        return 0
+    text = soul_path.read_text(encoding="utf-8")
+    idx = text.find("<!-- add:")
+    if idx == -1:
+        return 0
+    head, tail = text[:idx], text[idx:]
+    kept = [ln for ln in head.splitlines(keepends=True)
+            if not _re.search(pattern, ln)]
+    removed = len(head.splitlines()) - len(kept)
+    if not removed:
+        return 0
+    if dry_run:
+        print(f"[dry-run] manifest − {removed} entry/entries")
+        return removed
+    soul_path.write_text("".join(kept) + tail, encoding="utf-8")
+    return removed
+
+
+def _surface_for_roles(hermes_home: Path, profile: str, roles: set[str],
+                       vault_root: Path, dry_run: bool) -> None:
+    """Align a profile's skill overlay + SOUL block with its live roles.
+
+    Empty roles ⇒ full cleanup: SOUL block removed, skills uninstalled,
+    vault env dropped (the profile is unbound).
+    """
+    prof_home = profile_home(hermes_home, profile)
+    if not roles:
+        if not dry_run:
+            remove_soul_sections(prof_home / "SOUL.md")
+            uninstall_skills(prof_home / "skills", vault_root)
+            remove_profile_env(prof_home)
+        print(f"profile {profile}: unbound (surface removed)")
+        return
+    skill_role = _role_skill(roles)
+    if not dry_run:
+        install_skills(prof_home / "skills", role=skill_role)
+        ensure_soul_sections(prof_home / "SOUL.md", skill_role)
+    print(f"profile {profile}: {skill_role} "
+          f"({', '.join(sorted(roles))})")
+
+
+def role_bind(hermes_home: Path, vault_root: Path, profile: str,
+              new: bool = False, manager_role: bool = False,
+              domain: str = "", config_file: str = "",
+              dry_run: bool = False) -> None:
+    """Bind a profile to the vault (§4.5): ability surface + grants.
+
+    Without ``--domain``: profile-level bind (skill overlay + SOUL variant
+    + config seed + plugin enable + env) as contributor or ``--manager``.
+    With ``--domain`` (contributor-only): also create ``work/<name>/`` +
+    ``.vault/config.yaml`` (stub or ``--config``) when missing and grant
+    it. Idempotent. Refuses: ``--manager`` with ``--domain``; a domain
+    bind on the manager profile (managers hold no content grants).
+    """
+    if manager_role and domain:
+        raise ValueError("--manager and --domain are mutually exclusive "
+                         "(managers hold no content grants)")
+    import yaml
+    roles_path = vault_root / ".vault" / "roles.yaml"
+    if not roles_path.is_file():
         raise FileNotFoundError(
-            f"{rel_path} not under {vault_root} — run obsidian_scaffold "
-            f"first (this subcommand rides it)")
-    registry = grants.load_roles(vault_root)
-    # The engine's operations, not grant kinds: scaffold creates, so the
-    # owner needs the `create` operation (write grant) over the path.
-    if not (registry.allows(owner, "create", rel_path)
-            or registry.allows(owner, "edit", rel_path)):
-        try:
-            held = sorted(k for k in grants.GRANT_KINDS
-                          if registry.any_grant(owner, rel_path))
-        except grants.RolesError:
-            held = []   # unknown agent — no grants at all
-        raise PermissionError(
-            f"{owner} holds no write over {rel_path!r} "
-            f"(held: {held or 'none'})")
+            f"{roles_path} missing — scaffold the vault first")
+    prof_home = profile_home(hermes_home, profile)
+    if new:
+        if not prof_home.is_dir():
+            _create_profile(profile, "Vault manager" if manager_role
+                            else "Vault contributor")
+    elif not prof_home.is_dir():
+        raise FileNotFoundError(
+            f"profile '{profile}' does not exist — use --new to create it")
+    if manager_role:
+        _grant_role(roles_path, profile, "manager", dry_run=dry_run)
+    elif domain:
+        if _manager_profile(roles_path) == profile:
+            raise ValueError(
+                f"{profile} is the manager — managers hold no content "
+                f"grants; bind a contributor profile instead")
+        domain_dir = vault_root / "work" / domain
+        if not domain_dir.is_dir() and not dry_run:
+            (domain_dir / ".vault").mkdir(parents=True, exist_ok=True)
+            if config_file:
+                cfg = Path(config_file)
+                if not cfg.is_file():
+                    raise FileNotFoundError(f"config file not found: {cfg}")
+                raw = cfg.read_text(encoding="utf-8")
+                yaml.safe_load(raw)  # refuse to ship broken YAML
+                (domain_dir / ".vault" / "config.yaml").write_text(
+                    raw, encoding="utf-8")
+            else:
+                (domain_dir / ".vault" / "config.yaml").write_text(
+                    _domain_config_stub(domain), encoding="utf-8")
+        if dry_run:
+            print(f"[dry-run] mkdir {domain_dir} + .vault/config.yaml")
+        _append_agent_grant(roles_path, profile, domain, dry_run=dry_run)
+        if not dry_run:
+            ensure_conventions_file(prof_home / "skills", vault_root)
+    # surface aligned to the (now) live grants — combined when the profile
+    # already held content grants and is now also the manager
+    existing = _roles_from_grants(roles_path, profile)
+    roles = existing | ({"manager"} if manager_role else {"contributor"})
+    skill_role = _role_skill(roles)
+    if not dry_run:
+        install_skills(prof_home / "skills", role=skill_role)
+        ensure_soul_sections(prof_home / "SOUL.md", skill_role)
+        seed_profile_config(hermes_home, profile)
+        enable_plugin_for_profile(hermes_home, profile, vault_root)
+    if domain:
+        # after the surface: the manifest entry needs the add-marker the
+        # SOUL block provides (fresh binds have none before this point)
+        line = (f"- `conventions/{vault_conventions_name(vault_root)}` — "
+                f"{domain} domain conventions (work/{domain}/**)")
+        if dry_run:
+            print(f"[dry-run] manifest entry: {line}")
+        else:
+            append_manifest_entry(prof_home / "SOUL.md", line)
+    print(f"bound {profile}: {skill_role}"
+          + (f" + domain work/{domain}/**" if domain else ""))
 
-    owner_home = profile_home(hermes_home, owner)
-    if not owner_home.is_dir():
-        raise FileNotFoundError(f"profile '{owner}' does not exist")
-    ensure_conventions_file(owner_home / "skills", vault_root,
-                            dry_run=dry_run)
-    line = (f"- `conventions/{vault_conventions_name(vault_root)}` — "
-            f"{rel_path} conventions ({rel_path}/**)")
-    append_manifest_entry(owner_home / "SOUL.md", line, dry_run=dry_run)
+
+def role_unbind(hermes_home: Path, vault_root: Path, profile: str,
+                domain: str = "", dry_run: bool = False) -> None:
+    """Unbind a profile from the vault (§4.5).
+
+    Without ``--domain``: full unbind — grant block commented out, SOUL
+    ``## Vault`` block removed, skill overlay uninstalled, vault env vars
+    dropped; notice that owned domain trees remain. With ``--domain``:
+    unown just that domain (globs revoked, manifest entry removed, tree
+    kept). Refuses: unbinding the manager (a vault must keep a manager —
+    use ``transfer``); a domain unown on the manager.
+    """
+    import re as _re
+    roles_path = vault_root / ".vault" / "roles.yaml"
+    if not roles_path.is_file():
+        raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
+    prof_home = profile_home(hermes_home, profile)
+    if domain:
+        if _roles_from_grants(roles_path, profile) == {"manager"}:
+            raise ValueError(
+                f"{profile} is a pure manager — managers hold no content "
+                f"grants to revoke")
+        pairs = _domain_owned_globs(roles_path, profile, domain)
+        if not pairs:
+            raise ValueError(
+                f"{profile} holds no grants under work/{domain}/")
+        _revoke_globs(roles_path, profile, pairs, dry_run=dry_run)
+        if not dry_run:
+            remove_manifest_entries(
+                prof_home / "SOUL.md",
+                rf"\(work/{_re.escape(domain)}/\*\*\)")
+        print(f"domain work/{domain}/**: unowned from {profile}\n"
+              "  notice: the tree remains — remove it manually if wanted")
+        return
+    if _manager_profile(roles_path) == profile:
+        raise ValueError(
+            f"{profile} is the manager — a vault must keep a manager; "
+            f"use --role transfer {profile} --to NEW")
+    block = _block_text(roles_path, profile)
+    if not block:
+        print(f"{profile}: no active grants — nothing to revoke")
+    else:
+        import re as _re2
+        pairs = [(m.group(1), _re2.findall(r'"([^"]+)"', m.group(2)))
+                 for m in _re2.finditer(
+                     r"(?m)^    ([a-zA-Z0-9_-]+):\s*\[(.*?)\]", block)]
+        _revoke_globs(roles_path, profile, pairs, dry_run=dry_run)
+    if not dry_run and not _active_agent_names(roles_path):
+        raise ValueError(
+            "refusing: the vault would have no bound profiles at all")
+    if profile == "default":
+        print("  warning: default was the system owner — the skill stays "
+              "reachable as plugin:obsidian-vault")
+    if not dry_run:
+        remove_soul_sections(prof_home / "SOUL.md")
+        uninstall_skills(prof_home / "skills", vault_root)
+        remove_profile_env(prof_home)
+    print(f"unbound {profile} from {vault_root}\n"
+          "  notice: owned domain trees remain — remove them manually "
+          "if wanted")
+
+
+def role_transfer(hermes_home: Path, vault_root: Path, profile: str,
+                  to: str, domain: str = "", dry_run: bool = False) -> None:
+    """Move a role or domain ownership A → B (§4.5).
+
+    Without ``--domain``: manager handoff — B gains the manager grant and
+    its surface is refreshed (combined when B already holds content
+    grants); A is re-derived from its remaining grants (contributor
+    surface, or full unbind when nothing remains). With ``--domain``:
+    domain ownership moves A → B (B must be a bound contributor; the
+    manifest entry moves too).
+    """
+    import re as _re
+    roles_path = vault_root / ".vault" / "roles.yaml"
+    if not roles_path.is_file():
+        raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
+    if to == profile:
+        raise ValueError("transfer source and target are the same profile")
+    target_home = profile_home(hermes_home, to)
+    if not target_home.is_dir():
+        raise FileNotFoundError(
+            f"profile '{to}' does not exist — bind it first")
+    if domain:
+        if _roles_from_grants(roles_path, profile) == {"manager"}:
+            raise ValueError(
+                "the manager holds no content grants — --domain transfer "
+                "is for contributors")
+        pairs = _domain_owned_globs(roles_path, profile, domain)
+        if not pairs:
+            raise ValueError(
+                f"{profile} holds no grants under work/{domain}/")
+        _revoke_globs(roles_path, profile, pairs, dry_run=dry_run)
+        _append_agent_grant(roles_path, to, domain, dry_run=dry_run)
+        if not dry_run:
+            remove_manifest_entries(
+                profile_home(hermes_home, profile) / "SOUL.md",
+                rf"\(work/{_re.escape(domain)}/\*\*\)")
+        line = (f"- `conventions/{vault_conventions_name(vault_root)}` — "
+                f"{domain} domain conventions (work/{domain}/**)")
+        append_manifest_entry(target_home / "SOUL.md", line, dry_run=dry_run)
+        print(f"domain work/{domain}/**: {profile} → {to}")
+        return
+    if _manager_profile(roles_path) != profile:
+        raise ValueError(
+            f"{profile} is not the manager — a role transfer without "
+            f"--domain hands off the manager role")
+    _revoke_globs(roles_path, profile,
+                  [("meta", ["**"]), ("config", ["**"]),
+                   ("read", ["**"])], dry_run=dry_run)
+    _grant_role(roles_path, to, "manager", dry_run=dry_run)
+    src_roles = (_roles_from_grants(roles_path, profile)
+                 if not dry_run else set())
+    dst_roles = (_roles_from_grants(roles_path, to)
+                 if not dry_run else {"manager"})
+    _surface_for_roles(hermes_home, profile, src_roles, vault_root, dry_run)
+    _surface_for_roles(hermes_home, to, dst_roles, vault_root, dry_run)
+    print(f"manager role: {profile} → {to}")
+
+
+def role_list(hermes_home: Path, vault_root: Path) -> None:
+    """Who is bound to this vault: role, surface, grants, domains."""
+    import re as _re
+    roles_path = vault_root / ".vault" / "roles.yaml"
+    if not roles_path.is_file():
+        raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
+    print(f"vault: {vault_root}")
+    print(f"manager: {_manager_profile(roles_path) or 'NONE'}")
+    for name in _active_agent_names(roles_path):
+        roles = _roles_from_grants(roles_path, name)
+        prof_home = profile_home(hermes_home, name)
+        soul = prof_home / "SOUL.md"
+        soul_ok = soul.is_file() and SOUL_ANCHOR in soul.read_text(
+            encoding="utf-8", errors="replace")
+        skills_root = prof_home / "skills" / "note-taking"
+        skills = sorted(p.name for p in skills_root.glob("obsidian-vault*")
+                        if p.is_dir()) if skills_root.is_dir() else []
+        block = _block_text(roles_path, name)
+        domains = sorted(set(_re.findall(r'"work/([^/]+)/\*\*"', block)))
+        print(f"  {name}: role={','.join(sorted(roles)) or 'unbound'}"
+              f"  soul={'yes' if soul_ok else 'no'}"
+              f"  skills={skills or 'none'}"
+              f"  domains={domains}")
 
 
 def main() -> int:
@@ -1214,45 +1608,51 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true",
                     help="Print actions without performing them")
 
-    # Growth protocol (P5c) — mutually exclusive modes.
-    ap.add_argument("--vault", help="Vault root path (growth subcommands)")
-    growth = ap.add_mutually_exclusive_group()
-    growth.add_argument("--add-contributor", metavar="NAME",
-                        help="(manager) create a contributor profile bound "
-                             "to the vault: profile + overlay + SOUL + env")
-    growth.add_argument("--add-domain", metavar="DOMAIN",
-                        help="(manager) create work/<DOMAIN>/ + config + "
-                             "roles.yaml grant + SOUL manifest entry")
-    growth.add_argument("--add-subdomain", metavar="REL_PATH",
-                        help="(owner) register a scaffolded subdomain in "
-                             "the SOUL convention manifest")
-    ap.add_argument("--owner", metavar="PROFILE",
-                    help="Owner profile for --add-domain / --add-subdomain")
+    # Role mutation (P6, 06-growth-design §4.5) + setup questionnaire.
+    ap.add_argument("--vault", help="Vault root path (--role subcommands)")
+    ap.add_argument("--role", choices=["bind", "unbind", "transfer", "list"],
+                    help="Role mutation action (§4.5)")
+    ap.add_argument("profile", nargs="?", metavar="PROFILE",
+                    help="Target profile (bind/unbind/transfer)")
+    ap.add_argument("--to", metavar="NAME",
+                    help="Transfer target profile (--role transfer)")
+    ap.add_argument("--new", action="store_true",
+                    help="(bind) create the profile first")
+    ap.add_argument("--manager", action="store_true",
+                    help="(bind) bind as manager (mutually exclusive with "
+                         "--domain — managers hold no content grants)")
+    ap.add_argument("--domain", metavar="NAME",
+                    help="(bind/unbind/transfer) operate on work/<NAME>/**")
     ap.add_argument("--config", metavar="FILE",
-                    help="Prepared .vault/config.yaml for --add-domain "
+                    help="(bind --domain) prepared .vault/config.yaml "
                          "(default: minimal stub)")
     args = ap.parse_args()
 
     hermes_home = Path(os.environ.get("HERMES_HOME", "~/.hermes")).expanduser()
 
-    if args.add_contributor or args.add_domain or args.add_subdomain:
+    if args.role:
         if not args.vault:
-            ap.error("--vault is required with growth subcommands")
+            ap.error("--vault is required with --role")
         vault_root = Path(args.vault).expanduser()
-        if args.add_contributor:
-            add_contributor(hermes_home, args.add_contributor, vault_root,
-                            dry_run=args.dry_run)
-        elif args.add_domain:
-            if not args.owner:
-                ap.error("--add-domain requires --owner PROFILE")
-            add_domain(hermes_home, vault_root, args.add_domain,
-                       args.owner, config_file=args.config or "",
-                       dry_run=args.dry_run)
-        else:
-            if not args.owner:
-                ap.error("--add-subdomain requires --owner PROFILE")
-            add_subdomain(hermes_home, vault_root, args.add_subdomain,
-                          args.owner, dry_run=args.dry_run)
+        if args.role == "list":
+            role_list(hermes_home, vault_root)
+        elif args.role == "bind":
+            if not args.profile:
+                ap.error("--role bind requires --profile NAME")
+            role_bind(hermes_home, vault_root, args.profile,
+                      new=args.new, manager_role=args.manager,
+                      domain=args.domain or "", config_file=args.config or "",
+                      dry_run=args.dry_run)
+        elif args.role == "unbind":
+            if not args.profile:
+                ap.error("--role unbind requires --profile NAME")
+            role_unbind(hermes_home, vault_root, args.profile,
+                        domain=args.domain or "", dry_run=args.dry_run)
+        else:  # transfer
+            if not args.profile or not args.to:
+                ap.error("--role transfer requires --profile and --to")
+            role_transfer(hermes_home, vault_root, args.profile, args.to,
+                          domain=args.domain or "", dry_run=args.dry_run)
         return 0
 
     if args.setup:

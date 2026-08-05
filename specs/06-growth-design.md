@@ -210,8 +210,56 @@ The new directory is part of the contributor's own domain by default — no gran
 
 | Step | Kind | Where |
 |---|---|---|
+### 4.5 Role mutation — the `--role` verb family (2026-08-05)
+
+**Problem.** Setup is add-only: the questionnaire binds roles once, and growth
+only ever *adds* (contributors, domains, subdomains). Install choices are
+sticky — no post-install way to bind an existing profile, promote/demote,
+hand off the manager role, or unbind. Decisions locked with Davide
+(2026-08-05): single vault per profile (no multi-vault tool surface);
+unbind removes the `## Vault` SOUL block entirely; **a manager must always
+exist** — the escape is `transfer`, never a manager-less vault; `default` is
+unbound-able (with a warning — the skill stays reachable as
+`plugin:obsidian-vault`); domain unown keeps the tree (notice points at
+manual removal).
+
+**The verb.** One coherent surface (no parallel flag families):
+
+```
+--role bind PROFILE [--new] [--manager] [--domain NAME] [--config FILE]
+--role unbind PROFILE [--domain NAME]
+--role transfer PROFILE --to SUCCESSOR [--domain NAME]
+--role list
+```
+
+All take `--vault PATH` + `--dry-run`. The old `--add-contributor` /
+`--add-domain` / `--add-subdomain` / `--owner` / `--config` flags are
+removed — `bind` absorbs them.
+
+| Action | What it does |
+|---|---|
+| `bind PROFILE` | profile-level bind: `--new` creates the profile first; skill overlay + SOUL variant + config seed + plugin enable + env, per role (`--manager` or contributor). Grants: manager gets `meta/config/read: ["**"]`; a bare contributor gets **no content grant** yet — domains come next |
+| `bind PROFILE --domain NAME` | contributor-only (manager holds no content grants, D3): create `work/<name>/` + `.vault/config.yaml` (stub or `--config`) if missing; grant `write/append: ["work/<name>/**"]`; ensure the conventions file + SOUL manifest entry |
+| `unbind PROFILE` | full unbind: grant block **commented out** (comment-preserving, deny-by-default, re-bind-able — the blank preset's manager-stub pattern); SOUL `## Vault` block **removed**; skill overlay uninstalled (symlinks + this vault's conventions file + empty `conventions/`); vault env vars removed; notice: owned domain trees remain, remove manually if wanted. **Refuses when PROFILE is the manager** (vault must keep a manager) and when PROFILE is the last bound profile |
+| `unbind PROFILE --domain NAME` | unown one domain: the domain's globs removed from the grant block (line surgery; empty kind lines dropped; an emptied block is commented out), the domain's manifest entry removed, tree kept + notice. No SOUL/skill change |
+| `transfer PROFILE --to B` | manager handoff: B gets the manager grant + manager/combined skill + SOUL (combined when B already holds content grants); PROFILE loses the manager grant (commented) and is **re-derived from its remaining grants** — contributor SOUL/skills if it still owns content, full unbind if not |
+| `transfer PROFILE --to B --domain NAME` | domain owner change in one step: grant moved A→B, manifest entry moved, both SOULs untouched (both remain contributors) |
+| `list` | who is bound: per profile — role variant (contributor/manager/combined), skill installed, SOUL block present, grants by kind, domains owned |
+
+**Derivation — grants are the truth.** A profile's role is derived from its
+live roles.yaml block: the active `meta/config/read: ["**"]` block ⇒
+manager; any content-grant globs ⇒ contributor; both ⇒ combined; none ⇒
+unbound. The SOUL block is the *bind marker* (present ⟺ bound), written by
+`ensure_soul_sections`, removed by the new `remove_soul_sections`. The
+setup questionnaire remains the initial-creation flow; re-running it after
+mutations re-binds per its answers (documented: setup is "start over").
+
+**Invariants.** Manager always exists (`unbind`/`transfer` enforce);
+managers never hold content grants; `default` unbound-able with a warning;
+domain trees are never deleted by the layer; every write stays
+comment-preserving + idempotent + dry-run-capable.
 | Field suggestion, SOUL drafting, topic interpretation | LLM | agent, guided by references |
-| fs + config writes, grant lines, profile creation, manifest append | mechanical | `setup.py` subcommands (`--add-domain`, `--add-contributor`, `--add-subdomain`) |
+| fs + config writes, grant lines, profile creation, manifest append | mechanical | `setup.py` `--role` subcommands |
 | Everything auditable | mechanical | audit log + SOUL manifest |
 
 The agent is *aided through the process* (the user's ask): it knows the options at each stage, presents them, and executes mechanically — it does not improvise filesystem surgery.
