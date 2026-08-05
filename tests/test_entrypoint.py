@@ -18,6 +18,8 @@ import pytest
 
 import __init__ as plugin  # the plugin entrypoint (sys.path via conftest)
 
+_PLUGIN_DIR = Path(__file__).resolve().parent.parent
+
 
 class _FakeCtx:
     """Collects tool registrations without touching Hermes internals."""
@@ -75,3 +77,23 @@ def test_register_has_no_duplicates() -> None:
     ctx = _FakeCtx()
     plugin.register(ctx)
     assert len(ctx.tools) == len(set(ctx.tools))
+
+
+def test_plugin_yaml_provides_tools_match_register() -> None:
+    """plugin.yaml's provides_tools must never drift from register().
+
+    The manifest drives `hermes plugins install` tool-surface metadata;
+    a missing tool there is a fresh-machine gap that the dev symlink
+    hides (2026-08-05: was stale at 10 of 15 tools).
+    """
+    import yaml as _yaml
+
+    manifest = _yaml.safe_load(
+        (_PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8"))
+    declared = set(manifest["provides_tools"])
+    assert declared == EXPECTED_TOOLS
+    # Every declared tool is a real registered handler name (catches
+    # typos that set-membership against EXPECTED_TOOLS cannot).
+    ctx = _FakeCtx()
+    plugin.register(ctx)
+    assert declared <= set(ctx.tools)
