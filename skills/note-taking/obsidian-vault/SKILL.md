@@ -107,17 +107,16 @@ hand-create folders or configs.
 1. `obsidian_scaffold` — propose the folder and its field delta (patterns in
    `references/config-authoring.md`). The proposal shows what would change;
    structural keys need user confirmation.
-2. Register the subdomain in your SOUL Convention manifest:
-
-   ```bash
-   python3 scripts/setup.py --vault <vault> --add-subdomain work/<domain>/<sub> --owner <you>
-   ```
-
-   Refused when the folder does not exist (scaffold first) or you hold no
-   `write` over it. Run with `--dry-run` first to see the actions.
+2. No registration step — your grant covers `work/<domain>/**`, so the new
+   folder is inside your domain from birth. The SOUL manifest entry (added
+   by `--role bind --domain`) already covers the domain's conventions. Only
+   a genuinely separate domain needs new grants — ask the manager
+   (`--role bind <you> --domain <name>` to add, `--role transfer <you>
+   --to <other> --domain <name>` to hand it off).
 3. When the new folder's rules genuinely diverge from your main conventions,
-   give it its own conventions file (see above) and register it in the
-   manifest.
+   express them in its `.vault/config.yaml` (the scaffold delta) — the
+   conventions file and the SOUL manifest stay domain-scoped and
+   installer-managed (no manual registration).
 
 ## References — load what the task needs
 

@@ -174,7 +174,13 @@ This is the **config-authoring reference** (renamed from the earlier "field-patt
 
 Reference doc `06` companion: `references/growth-protocol.md` (or the SOUL manifest pointer). The three canonical flows come from Davide's 2026-08-04 examples. Every flow splits into **LLM steps** (suggest fields, draft SOUL, interpret topic — agent judgment) and **mechanical steps** (fs + config + manifest writes — subcommands, tested).
 
-### 4.1 Subdomain by contributor (Eg1 — "recipes")
+## 4 Growth flows
+
+> The mechanical steps in §4.1–4.3 name the P5c-era subcommands
+> (`--add-subdomain` / `--add-contributor` / `--add-domain`). §4.5 supersedes
+> them with the `--role` verb family; the flows themselves are unchanged.
+
+### 4.1 Subdomain by contributor (Eg1 — "recipes/keto")
 
 *Who:* domain owner + user, mid-conversation. *Grant basis:* D-2 (scaffold is write-gated).
 

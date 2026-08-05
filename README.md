@@ -51,18 +51,27 @@ One-agent setups are allowed: assign every role to a single profile (e.g.
 
 ## Growing a live vault
 
-After setup, the same script handles growth (manager + domain owner):
+After setup, the same script owns every post-install mutation via the
+`--role` verb (bind / unbind / transfer / list, §4.5):
 
 ```bash
-# manager: bind a new contributor profile
-python3 scripts/setup.py --vault <path> --add-contributor <NAME>
-# manager: create a full domain owned by that profile
-python3 scripts/setup.py --vault <path> --add-domain <DOMAIN> --owner <NAME>
-# domain owner: register a scaffolded subdomain (after obsidian_scaffold)
-python3 scripts/setup.py --vault <path> --add-subdomain work/<domain>/<sub> --owner <NAME>
+# bind a contributor profile (--new creates it); --domain adds a domain
+python3 scripts/setup.py --vault <path> --role bind <NAME> [--new] [--domain <DOMAIN>] [--config <FILE>]
+# bind a manager (a contributor who becomes the manager gets the combined surface)
+python3 scripts/setup.py --vault <path> --role bind <NAME> --manager
+# hand the manager role off (the successor is re-derived; the old manager
+# keeps any domains it owned)
+python3 scripts/setup.py --vault <path> --role transfer <NAME> --to <SUCCESSOR>
+# unbind (grants commented out, SOUL block removed; trees stay — remove
+# manually if wanted). Refuses for the manager — transfer instead.
+python3 scripts/setup.py --vault <path> --role unbind <NAME>
+# who is bound, with which role, surface, and domains
+python3 scripts/setup.py --vault <path> --role list
 ```
 
-The interactive reference for these flows: `skills/note-taking/obsidian-vault/references/growth-protocol.md`.
+The interactive reference for these flows:
+`skills/note-taking/obsidian-vault-management/references/growth-protocol.md`.
+Every subcommand supports `--dry-run`.
 
 ## Verifying
 

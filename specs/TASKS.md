@@ -641,6 +641,12 @@ is aided through the process, it never improvises filesystem surgery.*
   expected outputs, the SOUL manifest mechanics, the copy-on-write escape
   hatch (§2.3 — documented once here, closing that §6 open item), and
   pitfalls
+### P5c growth protocol — SUPERSEDED 2026-08-05
+
+The `--add-contributor` / `--add-domain` / `--add-subdomain` flags below were
+replaced by the `--role` verb family (bind/unbind/transfer/list) — see
+`TASKS-role-mutation.md` + 06-growth-design §4.5. Kept as the phase record.
+
 - ☑ **`--add-contributor NAME`** (manager): profile (if missing) + skill
   overlay (contributor role) + SOUL sections + config seed + plugin enable
   + env binding. Extracted from the installer's contributor loop — one
