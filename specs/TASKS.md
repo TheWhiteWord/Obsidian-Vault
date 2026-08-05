@@ -491,7 +491,7 @@ Standard-state changes: starter loses the three `*/issues/` folders + the
 `append: ["**/issues/**"]` grant lines (vestigial once issues are records);
 `ISSUES` joins `STATE`/`VAULT` in the portability test's reserved names.
 
-### P5 — Installation & growth system ☐
+### P5 — Installation & growth system ☑
 *Proves: growth — the trajectory's fifth step.* The installer goes from
 one-shot to a system that grows the vault. **Design discussion 2026-08-04**
 (Davide's `MARKDOWN-plugin-skil.md` overview + four settled questions). The
@@ -675,6 +675,38 @@ is aided through the process, it never improvises filesystem surgery.*
 - ☑ Live verification (dry-run against the real vault): the three guards
   fire (existing-grant owner refused, missing profile refused, missing
   subdomain dir refused), nothing written
+
+#### P5d — Install/setup redesign: deterministic questionnaire ☑
+*Proves: install and setup are separable, script-owned, and never
+LLM-improvised. **Complete 2026-08-05.** 287-test suite (286 + P5d).*
+
+- ☑ **Install = Hermes-native** (`hermes plugins install <git-url>`):
+  repo clone + auto-install of runtime deps via `plugin.yaml`
+  `pip_dependencies` (python-frontmatter, PyYAML — both lazy imports,
+  declared 2026-08-05). No manual git clone, no TWW paths in shipped
+  artifacts
+- ☑ **Setup = deterministic stage machine** (`scripts/setup.py --setup`):
+  script owns sequence, validation, and every fs decision; the agent only
+  relays `SETUP:question` JSON and feeds answers via `--answer`. Stages:
+  location → name → preset (standard|blank) → per-role profile assignment
+  → finalize recap. Invalid answers loop back with `SETUP:alert`
+- ☑ **Role accumulation (one-agent setups allowed):** mapping several
+  roles onto one profile yields the combined skill role (both directive
+  files) and unioned grants — the old `_append_agent_grant` "refuse
+  existing owner" path is deleted; one shared core `_ensure_agent_block`
+  (extend-or-append, comment-preserving, idempotent) serves setup +
+  growth
+- ☑ **`conventions_ref` is role-aware** (vault/context.py): lists
+  `manager.md` and/or `contributor.md` by the calling profile's actual
+  grants (scope-based: manager = meta/config at root `**`; contributor =
+  write over non-machinery paths; append-only does not qualify)
+- ☑ **Naming unified:** preset is `standard|blank` everywhere — the
+  legacy `default` preset name, the `--preset/--manager/--yes` flags, and
+  the interactive flow are gone; scaffold rejects unknown presets
+- ☑ **plugin.yaml coherence test** — `provides_tools` (15) must match the
+  entrypoint's registered tools (drift guard)
+- ☑ README rewritten for the install/setup split (stale TWW-era copy
+  replaced; one-line install prompt for the agent)
 
 ### P6 — Coder-plugin interaction ☐
 *Deferred (2026-08-04): a specific feature needing its own research and

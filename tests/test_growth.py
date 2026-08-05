@@ -111,7 +111,7 @@ def test_append_agent_grant_adds_block_and_parses(tmp_path):
     roles = vault / ".vault" / "roles.yaml"
     assert installer._append_agent_grant(roles, "bob", "recipes") is True
     text = roles.read_text(encoding="utf-8")
-    assert 'write:  ["work/recipes/**"]' in text
+    assert 'write: ["work/recipes/**"]' in text
     assert 'config: ["work/recipes/**"]' in text
     assert '"work/*/knowledge/**"' in text
 
@@ -128,12 +128,21 @@ def test_append_agent_grant_adds_block_and_parses(tmp_path):
     assert installer._append_agent_grant(roles, "bob", "recipes") is False
 
 
-def test_append_agent_grant_refuses_existing_owner(tmp_path):
+def test_append_agent_grant_extends_existing_owner(tmp_path):
+    """Role accumulation is first-class: an owner with grants is EXTENDED
+    (unioned), never refused (P6; old behavior refused with ValueError)."""
     hermes, vault = _scratch(tmp_path)
     roles = vault / ".vault" / "roles.yaml"
     installer._append_agent_grant(roles, "bob", "recipes")
-    with pytest.raises(ValueError, match="already has grants"):
-        installer._append_agent_grant(roles, "bob", "coding")
+    assert installer._append_agent_grant(roles, "bob", "coding") is True
+    text = roles.read_text(encoding="utf-8")
+    assert '"work/recipes/**"' in text
+    assert '"work/coding/**"' in text
+    registry = load_roles(vault)
+    assert registry.allows("bob", "create", "work/recipes/note.md")
+    assert registry.allows("bob", "create", "work/coding/note.md")
+    # idempotent after extension too
+    assert installer._append_agent_grant(roles, "bob", "coding") is False
 
 
 def test_append_agent_grant_refuses_key_after_agents(tmp_path):
@@ -181,7 +190,7 @@ def test_ensure_manager_grant_activates_blank_stub(tmp_path):
 def test_ensure_manager_grant_noop_on_starter(tmp_path):
     """The starter preset already ships the manager active — nothing to do."""
     hermes, vault = _scratch(tmp_path, with_vault=False)
-    installer.scaffold_vault(vault, "default")
+    installer.scaffold_vault(vault, "standard")
     scaffolded = vault / ".vault" / "roles.yaml"
     text = scaffolded.read_text(encoding="utf-8")
     assert "  vault-manager:" in text

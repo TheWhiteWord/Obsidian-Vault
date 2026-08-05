@@ -475,7 +475,8 @@ def scaffold_vault(vault_root: Path, preset: str,
                    dry_run: bool = False) -> list[Path]:
     """Create the vault root: .vault/ config + roles, and the tree.
 
-    preset="default"  → starter tree + per-domain configs (standard install).
+    preset="standard" → starter tree + per-domain configs (the standard
+                       install: 5-role starter).
     preset="blank"    → bare root: neutral config + deny-by-default roles
                         (custom installation; no domains until the manager
                         adds them).
@@ -483,11 +484,14 @@ def scaffold_vault(vault_root: Path, preset: str,
     scaffold — existing ones (customised policy) are preserved. dry_run
     prints the actions without touching the filesystem.
     """
-    source = STARTER if preset == "default" else BLANK
+    if preset not in ("standard", "blank"):
+        raise ValueError(
+            f"preset must be 'standard' or 'blank', got {preset!r}")
+    source = STARTER if preset == "standard" else BLANK
     if dry_run:
         print(f"[dry-run] mkdir {vault_root} (preset: {preset})")
         print(f"[dry-run] .vault/config.yaml + roles.yaml from {source.name}")
-        if preset == "default":
+        if preset == "standard":
             for rel in STARTER_TREE:
                 print(f"[dry-run] mkdir {vault_root / rel}")
         return [vault_root]
@@ -501,7 +505,7 @@ def scaffold_vault(vault_root: Path, preset: str,
     # Orientation doc — copy-if-missing so a customised README survives re-runs.
     _copy_if_missing(source / "README.md", vault_root / "README.md")
 
-    if preset == "default":
+    if preset == "standard":
         for rel in STARTER_TREE:
             d = vault_root / rel
             d.mkdir(parents=True, exist_ok=True)
@@ -607,6 +611,8 @@ def _validate_answer(stage: str, answer: str, hermes_home: Path) -> tuple[bool, 
     if stage == "location":
         if not answer.strip():
             return False, "vault location cannot be empty"
+        if not Path(answer).expanduser().is_absolute():
+            return False, "vault location must be an absolute path"
         return True, ""
     if stage == "name":
         if not answer.strip():
@@ -691,41 +697,44 @@ def _role_grants(role: str) -> list[tuple[str, list[str]]]:
     return []
 
 
-def _grant_role(roles_path: Path, profile: str, role: str,
-                dry_run: bool = False) -> bool:
-    """Ensure a profile's grant block covers a role (extend-or-append).
+def _ensure_agent_block(roles_path: Path, profile: str,
+                        needed: list[tuple[str, list[str]]],
+                        dry_run: bool = False, label: str = "") -> bool:
+    """Extend-or-append a profile's grant block with (kind, globs) lines.
 
-    Role accumulation (one-profile setups) means a profile may already
-    hold grants — `_append_agent_grant` REFUSES those owners, so this
-    helper unions the role's globs into an existing block instead.
-    Comment-preserving text surgery (policy comments must survive);
-    the result must re-parse as YAML. Idempotent: all globs already
-    present → no change, False.
+    THE grant mechanism — one implementation for every caller (setup role
+    assignment, growth domain creation). Role accumulation (one-profile
+    setups) means a profile may already hold grants: an existing block is
+    extended by unioning the missing globs into each kind line, never
+    refused. A profile with no block gets a full block appended. Comment-
+    preserving text surgery (policy comments must survive); the result
+    must re-parse as YAML. Idempotent: all globs already present → no
+    change, False.
     """
     import re as _re
     import yaml
 
-    # Manager globs are unioned into an existing block like any other role
-    # (one-agent setups: default-as-manager needs meta/config at root). Only
-    # when NO block exists do we delegate to _ensure_manager_grant, which
-    # knows how to activate the blank preset's COMMENTED stub.
-    text = roles_path.read_text(encoding="utf-8")
-    if role == "manager":
-        if not _re.search(rf"^  {_re.escape(profile)}:\s*$", text, _re.M):
-            return _ensure_manager_grant(roles_path, profile, dry_run=dry_run)
-        needed = [("meta", ["**"]), ("config", ["**"]), ("read", ["**"])]
-    else:
-        needed = _role_grants(role)
     if not needed:
         return False
+    text = roles_path.read_text(encoding="utf-8")
     m = _re.search(rf"^  {_re.escape(profile)}:\s*$", text, _re.M)
     if m is None:
-        # Fresh profile — append a full block (same shape as the growth
-        # protocol's _append_agent_grant).
+        # Fresh profile — append a full block at the end of agents:.
+        lines = text.splitlines(keepends=True)
+        agents_idx = next((i for i, ln in enumerate(lines)
+                           if ln.startswith("agents:")), None)
+        if agents_idx is None:
+            raise ValueError(f"{roles_path}: no 'agents:' section")
+        for ln in lines[agents_idx + 1:]:
+            if ln.strip() and not ln[:1].isspace() and not ln.startswith("#"):
+                raise ValueError(
+                    f"{roles_path}: top-level key after 'agents:' — "
+                    f"refusing blind append; add the grant by hand")
         block = f"  {profile}:\n" + "".join(
             f'    {kind}: {_fmt_globs(globs)}\n' for kind, globs in needed)
         if dry_run:
-            print(f"[dry-run] roles.yaml + grant block for {profile} ({role})")
+            print(f"[dry-run] roles.yaml + grant block for {profile}"
+                  + (f" ({label})" if label else ""))
             return True
         if not text.endswith("\n"):
             text += "\n"
@@ -780,7 +789,8 @@ def _grant_role(roles_path: Path, profile: str, role: str,
     if not changed:
         return False
     if dry_run:
-        print(f"[dry-run] roles.yaml + extend {profile} ({role})")
+        print(f"[dry-run] roles.yaml + extend {profile}"
+              + (f" ({label})" if label else ""))
         return True
     if inserts:
         for pos, line in inserts:
@@ -788,6 +798,29 @@ def _grant_role(roles_path: Path, profile: str, role: str,
     yaml.safe_load("".join(lines))
     roles_path.write_text("".join(lines), encoding="utf-8")
     return True
+
+
+def _grant_role(roles_path: Path, profile: str, role: str,
+                dry_run: bool = False) -> bool:
+    """Ensure a profile's grant block covers a role (extend-or-append).
+
+    Thin wrapper over :func:`_ensure_agent_block` with role-defined globs.
+    Manager globs are unioned into an existing block like any other role
+    (one-agent setups: default-as-manager needs meta/config at root); only
+    when NO block exists do we delegate to _ensure_manager_grant, which
+    knows how to activate the blank preset's COMMENTED stub.
+    """
+    import re as _re
+
+    text = roles_path.read_text(encoding="utf-8")
+    if role == "manager":
+        if not _re.search(rf"^  {_re.escape(profile)}:\s*$", text, _re.M):
+            return _ensure_manager_grant(roles_path, profile, dry_run=dry_run)
+        needed = [("meta", ["**"]), ("config", ["**"]), ("read", ["**"])]
+    else:
+        needed = _role_grants(role)
+    return _ensure_agent_block(roles_path, profile, needed,
+                               dry_run=dry_run, label=role)
 
 
 def _fmt_globs(globs: list[str]) -> str:
@@ -806,10 +839,7 @@ def _build_stage(stage: str, answer: str, state: dict,
     """
     if stage == "preset":
         vault_root = Path(state["answers"]["location"]).expanduser()
-        # The questionnaire's choice is standard|blank; the scaffold's
-        # legacy name for the starter tree is "default" (P6 mapping).
-        scaffold_preset = "default" if answer == "standard" else "blank"
-        created = scaffold_vault(vault_root, scaffold_preset, dry_run=dry_run)
+        created = scaffold_vault(vault_root, answer, dry_run=dry_run)
         return [f"vault scaffolded ({answer}): {len(created)} dirs"]
     if stage == "finalize":
         return _finalize(state, hermes_home, dry_run)
@@ -963,60 +993,23 @@ def append_manifest_entry(soul_path: Path, line: str,
 
 def _append_agent_grant(roles_path: Path, owner: str, domain: str,
                         dry_run: bool = False) -> bool:
-    """Append an owner grant block over ``work/<domain>/**`` in roles.yaml.
+    """Ensure an owner's grant block covers ``work/<domain>/**``.
 
-    Text-level surgery on purpose: roles.yaml is POLICY with comments, so
-    the block is appended at the end of the ``agents:`` section, never a
-    yaml round-trip (comments would die). Refuses when:
-      - ``agents:`` is not the last top-level key (ambiguous placement)
-      - the owner already has grants (extend by hand — manager-only)
-      - the appended block fails to parse as YAML
-    Idempotent: owner + globs already present → False, no change.
+    Thin wrapper over :func:`_ensure_agent_block` (the one grant
+    mechanism). Existing owners are EXTENDED, not refused — role
+    accumulation is first-class since P6; the old "refuse existing
+    owner" path is gone. Idempotent: owner + globs already present →
+    False, no change.
     """
-    import re as _re
-    import yaml
-
     if not roles_path.is_file():
         raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
-    text = roles_path.read_text(encoding="utf-8")
-
-    lines = text.splitlines(keepends=True)
-    agents_idx = next((i for i, ln in enumerate(lines)
-                       if ln.startswith("agents:")), None)
-    if agents_idx is None:
-        raise ValueError(f"{roles_path}: no 'agents:' section")
-
-    # Any top-level key after agents: would make append placement ambiguous.
-    for ln in lines[agents_idx + 1:]:
-        if ln.strip() and not ln[:1].isspace() and not ln.startswith("#"):
-            raise ValueError(
-                f"{roles_path}: top-level key after 'agents:' — refusing "
-                f"blind append; add the grant by hand")
-
-    if _re.search(rf"^  {_re.escape(owner)}:\s*$", text, _re.M):
-        if f'"work/{domain}/**"' in text:
-            return False  # already granted
-        raise ValueError(
-            f"{owner} already has grants in roles.yaml; add the "
-            f"work/{domain}/** globs by hand (manager-only policy edit)")
-
-    block = (
-        f"  {owner}:\n"
-        f'    write:  ["work/{domain}/**"]\n'
-        f'    config: ["work/{domain}/**"]\n'
-        f'    read:   ["work/{domain}/**", "work/*/knowledge/**"]\n'
-    )
-    if dry_run:
-        print(f"[dry-run] roles.yaml + grant block for {owner} "
-              f"(work/{domain}/**)")
-        return True
-    if not text.endswith("\n"):
-        text += "\n"
-    text += block
-    # Never ship broken YAML: the append must re-parse.
-    yaml.safe_load(text)  # raises YAMLError on failure
-    roles_path.write_text(text, encoding="utf-8")
-    return True
+    needed = [
+        ("write", [f"work/{domain}/**"]),
+        ("config", [f"work/{domain}/**"]),
+        ("read", [f"work/{domain}/**", "work/*/knowledge/**"]),
+    ]
+    return _ensure_agent_block(roles_path, owner, needed,
+                               dry_run=dry_run, label=domain)
 
 
 def _domain_config_stub(domain: str) -> str:

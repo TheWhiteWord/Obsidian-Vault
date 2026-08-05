@@ -23,7 +23,7 @@ VAULT/
 └── (domains appear as work/<name>/ when the manager adds them)
 ```
 
-No `system/`, no `work/` — those are the *standard default* preset's shape.
+No `system/`, no `work/` — those are the *standard* preset's shape.
 A blank vault starts empty and grows deliberately.
 
 ## Who does what
@@ -58,5 +58,5 @@ A blank vault starts empty and grows deliberately.
 ## Extending
 
 The full flow is scripted: `scripts/setup.py` (plugin) runs the setup
-questionnaire (custom vs standard default), installs the per-profile skill
+questionnaire (standard vs blank), installs the per-profile skill
 overlay, and writes these files.

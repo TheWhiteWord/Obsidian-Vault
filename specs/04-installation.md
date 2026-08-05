@@ -10,6 +10,12 @@ promotion (2026-08-04): one block, guided install, both presets.
 **Related:** `01-vault-v2-model.md` (model), `03-design-decisions.md` (D1–D9),
 `TASKS.md` (trajectory; P3.7d = the clean-slate E2E this doc records).
 
+> **Superseded in P5d (2026-08-05):** this doc records the pre-P5d
+> one-shot installer (interactive loop). The current flow is the
+> deterministic stage-machine questionnaire — see `scripts/setup.py`
+> `--setup` and `TASKS.md` P5d. The fresh-machine E2E results in §6
+> remain valid evidence for the mechanics they exercised.
+
 ---
 
 ## 1. What the installer does (one invocation)

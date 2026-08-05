@@ -95,11 +95,12 @@ files apply.
 - `references/maintenance.md` — the sweep: `obsidian_maintain` modes
   (delta / maintain / optimize), who runs it, how findings become ledger
   records. Manager-only (role-routed from the SOUL Issues section).
-- `references/growth-protocol.md` — how a vault grows: the interactive
-  reference for `--add-contributor` / `--add-domain` / `--add-subdomain`
-  (`scripts/setup.py`), LLM-step vs mechanical-step split, SOUL manifest
-  maintenance, copy-on-write escape hatch. Load when adding a contributor,
-  domain, or subdomain.
+- `references/growth-protocol.md` — how a vault grows and how a fresh
+  setup runs (the P5d questionnaire): `--add-contributor` /
+  `--add-domain` / `--add-subdomain` (`scripts/setup.py`), LLM-step vs
+  mechanical-step split, SOUL manifest maintenance, copy-on-write escape
+  hatch. Load when setting up a vault or adding a contributor, domain, or
+  subdomain.
 
 Load only what the task calls for; never load all references up front.
 

@@ -457,9 +457,9 @@ def test_soul_sections_creates_missing_soul(tmp_path):
 
 # --- scaffold_vault --------------------------------------------------------
 
-def test_scaffold_default_creates_tree(tmp_path):
+def test_scaffold_standard_creates_tree(tmp_path):
     root = tmp_path / "vault"
-    created = installer.scaffold_vault(root, "default")
+    created = installer.scaffold_vault(root, "standard")
     assert (root / ".vault" / "config.yaml").is_file()
     assert (root / ".vault" / "roles.yaml").is_file()
     for rel in ("system/handbook", "work/creative/knowledge",
@@ -496,13 +496,13 @@ def test_scaffold_copies_readme(tmp_path):
     """The starter README (orientation doc) is scaffolded into a new vault,
     and a customised one survives re-runs (copy-if-missing)."""
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     readme = root / "README.md"
     assert readme.is_file()
     assert readme.read_text(encoding="utf-8").strip()
     # customise, re-run, keep
     readme.write_text("# My vault README", encoding="utf-8")
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     assert readme.read_text(encoding="utf-8") == "# My vault README"
 
 
@@ -510,7 +510,7 @@ def test_scaffold_rerun_preserves_edited_roles(tmp_path):
     """The .vault configs are policy; re-scaffolding must not clobber edits
     (e.g. a customised contributor grant in roles.yaml)."""
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     roles = root / ".vault" / "roles.yaml"
     roles.write_text(roles.read_text(encoding="utf-8")
                      .replace('write:  ["work/creative/**"]',
@@ -518,17 +518,17 @@ def test_scaffold_rerun_preserves_edited_roles(tmp_path):
                      encoding="utf-8")
     edited = roles.read_text(encoding="utf-8")
 
-    installer.scaffold_vault(root, "default")  # re-run — idempotent for policy
+    installer.scaffold_vault(root, "standard")  # re-run — idempotent for policy
 
     assert roles.read_text(encoding="utf-8") == edited
     assert "work/creative/extra/**" in roles.read_text(encoding="utf-8")
     assert (root / "work" / "creative" / "knowledge").is_dir()  # tree still ensured
 
 
-def test_scaffold_default_copies_domain_configs(tmp_path):
+def test_scaffold_standard_copies_domain_configs(tmp_path):
     """Per-domain .vault configs (spec §3.3/§3.4/§3.6) ship with the starter."""
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     for rel in installer.DOMAIN_CONFIGS:
         assert (root / rel).is_file(), f"missing domain config: {rel}"
     # KNOWLEDGE schema is identical in every domain (the §3.3/§3.6 case).
@@ -541,12 +541,12 @@ def test_scaffold_default_copies_domain_configs(tmp_path):
 def test_scaffold_rerun_preserves_domain_configs(tmp_path):
     """Domain configs are policy too — re-scaffold must not wipe edits."""
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     cfg = root / "work/creative/.vault/config.yaml"
     cfg.write_text(cfg.read_text(encoding="utf-8") + "\n# custom\n", encoding="utf-8")
     edited = cfg.read_text(encoding="utf-8")
 
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
 
     assert cfg.read_text(encoding="utf-8") == edited
     assert "# custom" in cfg.read_text(encoding="utf-8")
@@ -554,7 +554,7 @@ def test_scaffold_rerun_preserves_domain_configs(tmp_path):
 
 def test_scaffold_wires_conventions_skill(tmp_path):
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     cfg = (root / ".vault" / "config.yaml").read_text(encoding="utf-8")
     assert "conventions:" in cfg and "obsidian-vault" in cfg
 
@@ -572,7 +572,7 @@ def test_starter_roles_ship_full_agent_set_active(tmp_path):
     built for exactly these five profiles (D8/D9). Nothing is commented:
     custom profile sets are a future design consideration, not the default."""
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
     agents = _starter_roles_agents(root)
 
     expected = {"default", "vault-manager", "creative", "dev", "researcher"}
@@ -585,7 +585,7 @@ def test_starter_roles_ship_full_agent_set_active(tmp_path):
 def test_starter_roles_globs_reach_domain_paths(tmp_path):
     from vault.grants import path_matches, load_roles
     root = tmp_path / "vault"
-    installer.scaffold_vault(root, "default")
+    installer.scaffold_vault(root, "standard")
 
     # default: owns system, reads all. No issues-channel grants — the issue
     # layer is a ledger (records, not notes); raising requires no grant

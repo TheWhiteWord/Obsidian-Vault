@@ -150,8 +150,9 @@ class TestGrantRole:
         assert parsed["agents"]["bob"]["write"] == ["work/creative/**"]
 
     def test_existing_profile_extended_not_refused(self, tmp_path):
-        # default already holds system/** — the accumulation case that
-        # _append_agent_grant refuses. _grant_role must union, not refuse.
+        # default already holds system/** — the role-accumulation case.
+        # Both grant paths (_grant_role, _append_agent_grant) extend an
+        # existing block by union; nothing refuses an owner anymore.
         roles = tmp_path / "roles.yaml"
         roles.write_text(
             "agents:\n  default:\n    write: [\"system/**\"]\n"
@@ -201,19 +202,31 @@ class TestRunSetup:
         assert state["answers"]["location"] == str(vault)
         assert state["stage"] == 1
 
+    def test_location_rejects_relative(self, scratch_home):
+        # a relative location would scaffold into the cwd (real bug found
+        # in a live drive — bad/name/ appeared in the repo root)
+        ok, alert = installer._validate_answer(
+            "location", "bad/name", scratch_home)
+        assert not ok and "absolute" in alert
+
     def test_invalid_answer_loops_back(self, scratch_home, capsys):
         rc = installer._run_setup(scratch_home, "bad/name", False, False)
-        # location accepts any non-empty; force loop-back on stage 2 (name)
+        # location rejects relative paths → loop-back, stage stays 0
+        assert rc == 1
+        out = capsys.readouterr().out
+        assert "SETUP:alert" in out
+        state = installer._load_setup_state(scratch_home)
+        assert state["stage"] == 0
+        # valid location, then force loop-back on stage 3 (preset)
         installer._run_setup(scratch_home, str(scratch_home / "v"), False, False)
         installer._run_setup(scratch_home, "ok", False, False)  # name
-        installer._run_setup(scratch_home, "standard", False, False)  # preset
         rc = installer._run_setup(scratch_home, "nonsense", False, False)
         assert rc == 1
         out = capsys.readouterr().out
         assert "SETUP:alert" in out
-        # stage did not advance
+        # stage did not advance past preset (stage 2)
         state = installer._load_setup_state(scratch_home)
-        assert state["stage"] == 3
+        assert state["stage"] == 2
 
     def test_reset_clears_state(self, scratch_home, capsys):
         installer._run_setup(scratch_home, "/tmp/v", False, False)

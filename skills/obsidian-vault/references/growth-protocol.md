@@ -96,8 +96,10 @@ grant change, no manager involvement.
    manifest entry to BOB's SOUL.
 
    Refused when: the vault is not scaffolded, BOB does not exist
-   (run `--add-contributor` first), the owner already has grants (extend
-   by hand — manager-only policy edit), or `--config` is broken YAML.
+   (run `--add-contributor` first), or `--config` is broken YAML.
+   An owner who already has grants is **extended**, not refused —
+   role accumulation (one profile, several roles/domains) is first-class
+   (P5d, 2026-08-05).
 
 6. **Report:** domain + profile + grants + SOUL, and what to do next.
 
@@ -106,20 +108,39 @@ its owner to exist).
 
 ---
 
-## 4. Custom install (Eg2 — "LIBRARY" vault, manager Billy)
+## 4. Fresh setup (the P5d questionnaire)
 
 *Who:* agent driving a fresh install. *Grant basis:* D-4 (neutral preset).
 
-1. **LLM step:** ask custom or standard default? (Standard recreates the
-   five-agent starter; custom is a bare vault.)
-2. **LLM + mechanical:** vault location + name; manager profile (new
-   "Billy" or existing).
-3. **LLM step:** SOUL tailoring choice — full tailored manager SOUL vs
-   basic editable default.
-4. **Mechanical:** vault scaffolded (neutral preset, no domains), manager
-   profile created, overlay installed, SOUL written.
-5. **Report:** vault created, manager = Billy, no domains yet — "to start
-   using the vault, ask Billy to create a domain" (§3).
+The setup flow is a **deterministic stage machine** — the script owns
+every decision; the agent only relays. Run once per stage:
+
+```bash
+python3 scripts/setup.py --setup                    # print the current question
+python3 scripts/setup.py --setup --answer <value>   # validate + build the stage
+python3 scripts/setup.py --setup --reset            # start over
+```
+
+Questions come back machine-readable (`SETUP:question` JSON); the agent
+relays them in-chat and feeds the user's answer back. An invalid answer
+loops back with `SETUP:alert` + the same question.
+
+Stages: **location** → **name** → **preset** (`standard`|`blank`) →
+per-role profile assignment → **finalize** (recap + state reset).
+
+- `standard` recreates the five-agent starter (roles: manager, creative,
+  dev, researcher + the implicit `default` system owner); `blank` is a
+  bare deny-by-default vault with just `default` + the manager role.
+- Each role accepts `create` (canonical profile name), `default` (map the
+  role onto the default profile), or `existing:NAME`.
+- **Role accumulation:** assigning several roles to one profile is
+  allowed — it gets the combined skill role (both directive files) and
+  unioned grants. One-agent setups are first-class.
+- The preset answer scaffolds the vault immediately; profile building
+  happens at finalize (accumulation needs all answers first).
+
+The agent's job is relay-only: no improvising prompts, no filesystem
+surgery, no invented stages — the script's question is the question.
 
 ---
 
@@ -187,9 +208,11 @@ conventions file so the next session knows why.
 - **Dry-run first:** every subcommand supports `--dry-run` — it prints the
   actions without touching the filesystem.
 - **`--vault` is required** with growth subcommands.
-- **Roles.yaml is policy with comments:** grants are appended at the end of
-  the `agents:` section, never round-tripped (comments would die). If the
-  owner already has grants, extend by hand — the subcommand refuses.
+- **Roles.yaml is policy with comments:** grants are added by
+  comment-preserving text surgery, never round-tripped (comments would
+  die). An owner with existing grants is extended by unioning the missing
+  globs in — role accumulation is first-class; nothing is refused or
+  hand-edited (P5d, 2026-08-05).
 - **Broken YAML is refused** before any write (`--config` and the appended
   grant block are re-parsed).
 - **Manager SOULs refuse manifest appends** — that is the guard that keeps

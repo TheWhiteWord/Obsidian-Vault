@@ -6,7 +6,7 @@ tags: [vault, orientation]
 created: "@today"
 description: Vault orientation — layout, roles, and how the issue ledger works.
 ---
-# Starter vault — suggested layout (default preset)
+# Starter vault — suggested layout (standard preset)
 
 A copyable example of the plugin's **convention layer** (D1/D3): mechanism is
 in the engine, this is one coherent named pattern offered at setup. Copy into
