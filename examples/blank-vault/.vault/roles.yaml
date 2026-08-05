@@ -1,0 +1,28 @@
+# Agent grants — blank preset (custom installation)
+# POLICY. The grant *kinds* are universal engine mechanism; which paths each
+# agent holds is this vault's choice. Deny-by-default: unlisted agents get
+# nothing.
+#
+#   read    read notes, query context
+#   write   create, edit, delete
+#   append  create only — no edit, no delete
+#   meta    frontmatter / links / tags — never body prose
+#   config  vocabulary sections of .vault/*.yaml — never grants or field defs
+
+agents:
+  # System owner — the default Hermes profile. The only agent with
+  # `.hermes`-wide reach; uses the plugin as one tool among many. In a blank
+  # vault with no domains yet, `default` is the only active agent.
+  default:
+    write:  ["system/**"]
+    read:   ["**"]
+
+  # Manager — maintenance only. Structurally incapable of altering prose:
+  # `meta` everywhere, `read` everywhere, no `write` over content domains.
+  # COMMENTED OUT in the blank preset: the custom-install flow asks whether
+  # to create a manager profile (or reuse one) — uncomment (or add) the
+  # manager block when one exists, exactly like the starter preset.
+  # vault-manager:
+  #   meta:   ["**"]
+  #   config: ["**"]
+  #   read:   ["**"]

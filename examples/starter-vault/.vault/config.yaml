@@ -1,0 +1,58 @@
+# Vault root config — starter preset
+# MECHANISM lives in the plugin; POLICY lives here. This file is one
+# configuration of a general vault engine — trees, fields, and vocabularies
+# are all chosen here, not assumed by the code.
+
+fields:
+  type:
+    required: true
+    vocabulary: true          # declared/observed lifecycle applies
+    allowed: [index, note]
+  kind:
+    required: true
+    multi: true
+    vocabulary: true
+    allowed: [note, index, reference]   # issues live in the ledger (spec 05), not as notes
+  status:
+    required: true
+    allowed: [draft, active, paused, completed, reference]
+  tags:
+    required: true
+    multi: true
+  created:
+    required: true
+    format: date
+  # Advisory one-line summary — surfaced in INDEX so notes are triageable
+  # without opening them. Prompted by obsidian_context, never blocking.
+  description:
+    required: false
+
+defaults:
+  status: draft
+  created: "@today"
+
+tags:
+  mode: suggest
+
+validation:
+  fields: blocking
+  tags: advisory
+
+# Where machine-written state goes. Default is vault-root .state/ (dot-
+# prefixed, reads as machinery); the engine creates it on first use.
+paths:
+  state: .state
+
+# INDEX renders this field's value so notes are triageable without opening
+# them. The field name is policy; only the `summary_field` key is engine.
+summary_field: description
+
+# Which skill owns this vault's writing conventions. obsidian_context returns
+# it as `conventions_ref` (a pointer, never the content — D7). Default:
+# obsidian-vault (the plugin's bundled skill, copied into profiles at setup).
+conventions:
+  skill: obsidian-vault
+
+vocabulary:
+  promote_after_uses: 3
+  promote_after_days: 14

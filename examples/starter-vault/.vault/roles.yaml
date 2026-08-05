@@ -1,0 +1,52 @@
+# Agent grants — starter preset (D8/D9)
+# POLICY. The grant *kinds* are universal engine mechanism; which paths each
+# agent holds is this vault's choice.
+#
+#   read    read notes, query context
+#   write   create, edit, delete
+#   append  create only — no edit, no delete
+#   meta    frontmatter / links / tags — never body prose
+#   config  vocabulary sections of .vault/*.yaml — never grants or field defs
+
+agents:
+  # System owner — the default Hermes profile. The only agent with
+  # `.hermes`-wide reach; uses the plugin as one tool among many. Owns the
+  # system tree (handbook, logs, decisions), reads everything.
+  default:
+    write:  ["system/**"]
+    config: ["system/**"]
+    read:   ["**"]
+
+  # Maintenance only. Structurally incapable of altering prose: `meta`
+  # everywhere, `read` everywhere, no `write` over content domains.
+  vault-manager:
+    meta:   ["**"]
+    config: ["**"]
+    read:   ["**"]
+
+  # Domain contributors — the standard install ships the full agent set
+  # ACTIVE: the vault is built for exactly these profiles, so their grants
+  # are granted by default. Each owns its domain (including its knowledge/);
+  # reads all other domains' knowledge via the shared glob. Knowledge folders
+  # are also domain of the researcher profile (D9): `work/*/knowledge/**`
+  # crosses domains because knowledge is two levels under the root
+  # (work/<domain>/knowledge/), so the single-segment `*` glob reaches every
+  # domain's knowledge. Custom installs (different profiles/domains) are a
+  # future design consideration; the installer's interactive loop names
+  # profiles to match this standard set.
+  creative:
+    write:  ["work/creative/**"]
+    config: ["work/creative/**"]
+    read:   ["work/creative/**", "work/*/knowledge/**"]
+  dev:
+    write:  ["work/coding/**"]
+    config: ["work/coding/**"]
+    read:   ["work/coding/**", "work/*/knowledge/**"]
+
+  # Shared research domain — provides research for every domain. Owns all
+  # knowledge folders under work/ (and their INDEXes); read access to system
+  # records.
+  researcher:
+    write:  ["work/*/knowledge/**"]
+    config: ["work/*/knowledge/**"]
+    read:   ["work/*/knowledge/**", "system/**"]

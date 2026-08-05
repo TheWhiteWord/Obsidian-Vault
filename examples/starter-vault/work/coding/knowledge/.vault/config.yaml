@@ -1,0 +1,18 @@
+# */knowledge — the KNOWLEDGE schema (§3.6 of the v2 model)
+# Identical in every domain: knowledge notes are typed `knowledge`, cite a
+# source, and carry a retrieval date + confidence. This is the proving case
+# for §3.3 inheritance — same subfolder name, same schema, inheriting a
+# different parent in each domain.
+fields:
+  type:
+    allowed_only: [knowledge]
+  source:
+    required: true
+  retrieved:
+    required: true
+    format: date
+  confidence:
+    allowed: [high, medium, low]
+defaults:
+  status: reference
+  kind: [reference]

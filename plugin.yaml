@@ -1,0 +1,16 @@
+name: obsidian-vault
+version: 0.4.0
+description: "Schema-driven, permission-enforced Obsidian vault engine. Config inheritance, grant enforcement, validated writes, generated indexes, scaffolding, self-describing config, deterministic graph + search."
+author: TWW + Hermes
+kind: backend
+provides_tools:
+  - obsidian_context
+  - obsidian_write
+  - obsidian_edit_metadata
+  - obsidian_delete
+  - obsidian_scaffold
+  - obsidian_index
+  - obsidian_audit
+  - obsidian_reference
+  - obsidian_search
+  - obsidian_graph

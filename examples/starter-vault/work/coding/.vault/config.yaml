@@ -1,0 +1,7 @@
+# work/coding — domain vocabulary (starter preset)
+# POLICY for this domain only. Extends the root vocabulary via union (§3.3).
+fields:
+  type:
+    allowed: [api, spec, howto, knowledge]
+  kind:
+    allowed: [design, snippet, changelog, reference]

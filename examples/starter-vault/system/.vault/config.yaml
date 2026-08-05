@@ -1,0 +1,7 @@
+# system — system-records vocabulary (starter preset)
+# POLICY for this domain only. Extends the root vocabulary via union (§3.3).
+fields:
+  type:
+    allowed: [spec, record, howto, decision]
+  kind:
+    allowed: [spec, log, decision, howto, api-reference]

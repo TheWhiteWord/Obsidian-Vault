@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local test venv (created via uv; not source)
+.venv-test/
+
+# Editor
+.vscode/
+.idea/

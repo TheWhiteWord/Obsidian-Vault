@@ -1,0 +1,48 @@
+# Vault root config — blank preset (custom installation)
+# MECHANISM lives in the plugin; POLICY lives here. This is the minimal
+# schema a bare vault starts from: the five core fields, no domain
+# vocabulary. Domains are added later by the manager (growth protocol).
+
+fields:
+  type:
+    required: true
+    vocabulary: true
+    allowed: [note]
+  kind:
+    required: true
+    multi: true
+    vocabulary: true
+    allowed: [note, reference]
+  status:
+    required: true
+    allowed: [draft, active, completed, reference]
+  tags:
+    required: true
+    multi: true
+  created:
+    required: true
+    format: date
+  # Advisory one-line summary — surfaced in INDEX, prompted never blocking.
+  description:
+    required: false
+
+defaults:
+  status: draft
+  created: "@today"
+
+tags:
+  mode: suggest
+
+validation:
+  fields: blocking
+  tags: advisory
+
+# Which skill owns this vault's writing conventions. obsidian_context returns
+# it as `conventions_ref` (a pointer, never the content — D7). Default:
+# obsidian-vault (the plugin's bundled skill, copied into profiles at setup).
+conventions:
+  skill: obsidian-vault
+
+vocabulary:
+  promote_after_uses: 3
+  promote_after_days: 14

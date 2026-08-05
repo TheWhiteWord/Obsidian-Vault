@@ -1,0 +1,10 @@
+# work/creative — domain vocabulary (starter preset)
+# POLICY for this domain only. Extends the root vocabulary via union (§3.3):
+# a note in work/creative/ accepts these type/kind values in addition to the
+# root's [index, note] / [note, index, reference]. Never re-declares root
+# fields; only what this domain adds or changes.
+fields:
+  type:
+    allowed: [idea, project, knowledge]
+  kind:
+    allowed: [concept, sketch, draft, reference]
