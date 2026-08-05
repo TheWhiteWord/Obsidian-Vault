@@ -568,6 +568,9 @@ def _load_setup_state(hermes_home: Path) -> dict:
 
 
 def _save_setup_state(hermes_home: Path, state: dict) -> None:
+    # The setup state is often the first thing written into a virgin home
+    # (fresh-machine E2E) — create the home dir rather than crashing.
+    hermes_home.mkdir(parents=True, exist_ok=True)
     _setup_state_path(hermes_home).write_text(
         json.dumps(state, indent=2), encoding="utf-8")
 
@@ -1288,6 +1291,8 @@ def _run_setup(hermes_home: Path, answer: str | None, reset: bool,
     for line in recap:
         print(f"{B_MARK} {line}")
     if stage == "finalize":
+        # Completion marker — the agent relays it verbatim; setup is over.
+        print(f"{D_MARK} setup complete — restart Hermes to activate")
         return 0
     state["stage"] = idx + 1
     _save_setup_state(hermes_home, state)

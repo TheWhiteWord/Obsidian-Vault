@@ -232,8 +232,20 @@ class TestRunSetup:
         installer._run_setup(scratch_home, "/tmp/v", False, False)
         assert installer._setup_state_path(scratch_home).is_file()
         rc = installer._run_setup(scratch_home, None, True, False)
-        assert rc == 0
+        assert rc == 0 and "reset" in capsys.readouterr().out
         assert not installer._setup_state_path(scratch_home).exists()
+
+    def test_answer_creates_virgin_home(self, tmp_path, capsys):
+        # a fresh machine has NO hermes home yet — the first --answer must
+        # create it (real bug found by the fresh-machine E2E, 2026-08-05:
+        # _save_setup_state crashed with FileNotFoundError)
+        home = tmp_path / "no-such-home"
+        vault = tmp_path / "vault"
+        rc = installer._run_setup(home, str(vault), False, False)
+        assert rc == 0
+        state = installer._load_setup_state(home)
+        assert state["stage"] == 1
+        assert state["answers"]["location"] == str(vault)
 
     def test_full_standard_drive(self, scratch_home, capsys, monkeypatch):
         """The whole questionnaire against a scratch home, one-agent setup:
