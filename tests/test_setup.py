@@ -268,8 +268,13 @@ def test_seed_warns_when_no_default_config(tmp_path):
 # --- enable_plugin_for_profile ----------------------------------------------
 
 def test_enable_plugin_default_uses_bare_command(tmp_path, monkeypatch):
-    """default is enabled via bare `hermes plugins enable` (no --profile) and
-    gets no symlink (the bundle already lives at the HERMES_HOME root)."""
+    """default is enabled via bare `hermes plugins enable` (no --profile).
+
+    2026-08-04 fix (fresh-machine E2E): default ALSO gets the plugin linked
+    into its root plugins dir — plugin discovery scans <home>/plugins, so
+    without the link a fresh install's bare enable fails with "not installed
+    or bundled". The old "no symlink" assertion encoded the dev-machine
+    assumption (bundle already present at the root)."""
     home = tmp_path / "home"
     home.mkdir()
     (home / "config.yaml").write_text("plugins:\n  enabled: []\n",
@@ -286,7 +291,9 @@ def test_enable_plugin_default_uses_bare_command(tmp_path, monkeypatch):
     assert calls and calls[0][:2] == ["hermes", "plugins"]
     assert "--profile" not in calls[0]
     assert "obsidian-vault" in calls[0]
-    assert not (home / "plugins" / "obsidian-vault").exists()  # no symlink
+    link = home / "plugins" / "obsidian-vault"
+    assert link.is_symlink()                     # linked — discovery needs it
+    assert link.resolve() == installer.PLUGIN_DIR.resolve()
     env = (home / ".env").read_text(encoding="utf-8")
     assert "OBSIDIAN_VAULT_AGENT=default" in env
     assert "OBSIDIAN_VAULT_PATH=/vault" in env

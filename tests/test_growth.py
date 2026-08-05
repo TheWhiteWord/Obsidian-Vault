@@ -154,6 +154,41 @@ def test_append_agent_grant_dry_run_writes_nothing(tmp_path):
     assert roles.read_text(encoding="utf-8") == before
 
 
+# --- manager grant activation (blank preset fix, 2026-08-04) --------------
+
+def test_ensure_manager_grant_activates_blank_stub(tmp_path):
+    """The blank preset ships the manager block commented; the installer must
+    activate it so a custom-install manager holds meta/config/read."""
+    hermes, vault = _scratch(tmp_path)   # blank preset
+    roles = vault / ".vault" / "roles.yaml"
+    assert "  vault-manager:" not in roles.read_text(encoding="utf-8")
+    assert "# vault-manager:" in roles.read_text(encoding="utf-8")
+
+    assert installer._ensure_manager_grant(roles, "vault-manager") is True
+    text = roles.read_text(encoding="utf-8")
+    assert "  vault-manager:" in text          # block active
+    assert "# vault-manager:" not in text      # stub replaced, not duplicated
+    assert 'meta:   ["**"]' in text
+
+    registry = load_roles(vault)
+    assert registry.allows("vault-manager", "edit_meta", "system/x.md")
+    assert registry.allows("vault-manager", "edit_config", ".vault/config.yaml")
+
+    # Idempotent: an active block is left alone.
+    assert installer._ensure_manager_grant(roles, "vault-manager") is False
+
+
+def test_ensure_manager_grant_noop_on_starter(tmp_path):
+    """The starter preset already ships the manager active — nothing to do."""
+    hermes, vault = _scratch(tmp_path, with_vault=False)
+    installer.scaffold_vault(vault, "default")
+    scaffolded = vault / ".vault" / "roles.yaml"
+    text = scaffolded.read_text(encoding="utf-8")
+    assert "  vault-manager:" in text
+    assert installer._ensure_manager_grant(scaffolded, "vault-manager") is False
+    assert scaffolded.read_text(encoding="utf-8") == text
+
+
 # --- add_contributor -------------------------------------------------------
 
 def test_add_contributor_installs_overlay_and_soul(tmp_path):

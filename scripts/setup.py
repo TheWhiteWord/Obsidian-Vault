@@ -393,11 +393,15 @@ def enable_plugin_for_profile(hermes_home: Path, name: str, vault_root: Path) ->
     Named profiles: symlink the bundle into the profile's plugins dir and
     enable it via the CLI (``hermes --profile <name> plugins enable``), which
     writes ``plugins.enabled`` into that profile's config.yaml. The `default`
-    profile is the HERMES_HOME root — the plugin already lives there, so no
-    symlink, but it is *still* enabled via the bare ``hermes plugins enable``
-    (a fresh install has no obsidian entries at all). Every profile gets
-    OBSIDIAN_VAULT_PATH and OBSIDIAN_VAULT_AGENT in its .env. Enable
-    failures are surfaced as warnings, not swallowed.
+    profile is the HERMES_HOME root: the bundle is linked into its root
+    plugins dir (same symlink as named profiles — plugin discovery scans
+    ``<home>/plugins``) and enabled via the bare ``hermes plugins enable``.
+    A fresh user machine has NO obsidian entry at all: without the link the
+    bare enable fails with "not installed or bundled" (the old code assumed
+    the bundle already lived at the root — true only on a dev machine that
+    symlinked it by hand; fixed 2026-08-04 by the fresh-machine E2E probe).
+    Every profile gets OBSIDIAN_VAULT_PATH and OBSIDIAN_VAULT_AGENT in its
+    .env. Enable failures are surfaced as warnings, not swallowed.
     """
     import subprocess
     prof_home = profile_home(hermes_home, name)
@@ -406,6 +410,7 @@ def enable_plugin_for_profile(hermes_home: Path, name: str, vault_root: Path) ->
         cmd = ["hermes", "--profile", name, "plugins", "enable",
                "obsidian-vault", "--no-allow-tool-override"]
     else:
+        link_plugin(hermes_home / "plugins")
         cmd = ["hermes", "plugins", "enable",
                "obsidian-vault", "--no-allow-tool-override"]
     res = subprocess.run(cmd, check=False, capture_output=True,
@@ -665,6 +670,48 @@ def _domain_config_stub(domain: str) -> str:
     )
 
 
+def _ensure_manager_grant(roles_path: Path, manager: str,
+                          dry_run: bool = False) -> bool:
+    """Activate the manager's grant block in roles.yaml (blank preset).
+
+    The blank preset ships the manager block COMMENTED OUT (deny-by-default
+    until a manager exists). When the installer creates/reuses a manager
+    profile, that block must become active — otherwise the custom-install
+    manager holds no grants at all and every maintenance operation fails.
+    Idempotent: an active ``<manager>:`` block is left alone.
+    """
+    import re as _re
+    import yaml
+
+    if not roles_path.is_file():
+        raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
+    text = roles_path.read_text(encoding="utf-8")
+
+    if _re.search(rf"^  {_re.escape(manager)}:\s*$", text, _re.M):
+        return False  # already an active grant block
+
+    # The blank preset's commented stub — any manager name, commented lines.
+    stub = _re.search(r"^  # [a-zA-Z0-9_-]+:\n(?:^  # .*\n?)*", text, _re.M)
+    block = (
+        f"  {manager}:\n"
+        f'    meta:   ["**"]\n'
+        f'    config: ["**"]\n'
+        f'    read:   ["**"]\n'
+    )
+    if dry_run:
+        print(f"[dry-run] roles.yaml + active manager block for {manager}")
+        return True
+    if stub:
+        text = text[:stub.start()] + block + text[stub.end():]
+    else:
+        if not text.endswith("\n"):
+            text += "\n"
+        text += block
+    yaml.safe_load(text)  # never ship broken YAML
+    roles_path.write_text(text, encoding="utf-8")
+    return True
+
+
 def add_contributor(hermes_home: Path, name: str, vault_root: Path,
                     dry_run: bool = False) -> None:
     """Growth (manager): create a contributor profile bound to the vault.
@@ -857,6 +904,15 @@ def main() -> int:
                         "Vault maintenance: meta/config/read, "
                         "no content ownership")
     touched.append((manager_name, True))
+
+    # The manager must be GRANTED, not just created. The blank preset ships
+    # its manager block commented out (deny-by-default until a manager
+    # exists); a created/reused manager profile with no grants can't run a
+    # single maintenance operation. The starter preset's block is already
+    # active, so this is a no-op there (idempotent).
+    if _ensure_manager_grant(vault_root / ".vault" / "roles.yaml",
+                             manager_name, dry_run=args.dry_run):
+        print(f"Manager grants active in roles.yaml: {manager_name}")
 
     profile_skills = profile_home(hermes_home, manager_name) / "skills"
     if args.manager == "reuse" and not profile_skills.exists():

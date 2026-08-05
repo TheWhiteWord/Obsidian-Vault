@@ -1,9 +1,11 @@
 # 04 — First-Time Installation
 
-**Status: DRAFT — working install spec, NOT the shipped plugin README.**
-This document captures the installer procedure as proven by the clean-slate
-E2E (2026-08-03) and the open questions that must close before it is promoted
-into the plugin bundle's README. It is TWW-local; nothing here ships in code.
+**Status: DRAFT — working install spec.** Captures the installer procedure
+as proven by the clean-slate E2Es (2026-08-03 dev-machine, 2026-08-04
+**fresh-machine repo install — both presets**) and the open questions that
+must close before it is promoted into the plugin README. It is TWW-local;
+nothing here ships in code. The README's agent-install paste-box is the
+promotion (2026-08-04): one block, guided install, both presets.
 
 **Related:** `01-vault-v2-model.md` (model), `03-design-decisions.md` (D1–D9),
 `TASKS.md` (trajectory; P3.7d = the clean-slate E2E this doc records).
@@ -121,7 +123,31 @@ From the P3.7d clean-slate run, the minimum proof set:
   `default` owns `system/` rule is TWW vault policy, not engine mechanism.
   Keep policy out of the README; point at the vault's `roles.yaml`.
 
-## 6. Promote to README when…
+## 6. Fresh-machine E2E (2026-08-04 — repo install, both presets)
+
+Ran the README's agent-install flow against a **fresh HERMES_HOME + vault**
+for `default` and `blank` presets (scratch dirs, real installer, real
+`hermes` CLI via HERMES_HOME). Two real bugs surfaced, both fixed:
+
+1. **Blank preset: manager created but never granted.** Blank `roles.yaml`
+   ships the manager block commented (deny-by-default until a manager
+   exists); the installer created the profile but never activated the block
+   → a custom-install manager holds zero grants. Fixed: `_ensure_manager_grant`
+   un-comments/activates it (no-op on the starter preset, which ships it
+   active).
+2. **Default profile: plugin enable failed on a fresh machine** —
+   "Plugin 'obsidian-vault' is not installed or bundled." The old code
+   assumed the bundle already lived at the HERMES_HOME root (true only on a
+   dev machine that symlinked it by hand). Fixed: `enable_plugin_for_profile`
+   links the bundle into the default profile's root `plugins/` dir, same as
+   named profiles — discovery scans `<home>/plugins`.
+
+The probe script (`/tmp/hermes-verify-install-e2e.py` pattern, re-created
+per run) verifies: profile creation, skill overlay symlinks, SOUL sections,
+.env vars, vault tree + configs, **zero enable WARNINGs**, and a functional
+grant probe through the engine (deny-by-default fires; contributors scoped).
+
+## 7. Promote to README when…
 
 - [ ] C1–C4 resolved.
 - [ ] Procedure stable across P3.8 (`!pattern` exclusions) and P4
