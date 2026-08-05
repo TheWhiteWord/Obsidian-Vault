@@ -65,7 +65,8 @@ flow; re-running it after mutations re-binds per its answers ("start over").
    default), 16 checks. **ALL PASS.**
 5. **Docs** — manager bundle growth-protocol.md rewritten to `--role`;
    engineering skill growth section updated; tracker created. **DONE**
-6. **Commit prep** — see `git status`; Davide pushes via VS Code.
+6. **Commit prep** — `4d550ba` (mutation) + `553c281` (docs sweep), both on
+   `main`, working tree clean. Davide pushes via VS Code.
 
 ## Invariants enforced
 
