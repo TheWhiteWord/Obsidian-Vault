@@ -1,0 +1,32 @@
+# Agent grants — spec §2.1, §2.2
+# POLICY. The grant *kinds* are universal engine mechanism; which paths each
+# agent holds is this vault's choice.
+#
+#   read    read notes, query context
+#   write   create, edit, delete
+#   append  create only — no edit, no delete
+#   meta    frontmatter / links / tags — never body prose
+#   config  vocabulary sections of .vault/*.yaml — never grants or field defs
+
+agents:
+  # System/dev owner. Reads everything for structural awareness; authors
+  # only in SYSTEM.
+  system:
+    write:  ["SYSTEM/**"]
+    read:   ["**"]
+    append: ["*/ISSUES/**"]
+
+  # Creative partner. Owns CREATIVE; reads curated knowledge everywhere.
+  tww:
+    write:  ["CREATIVE/**"]
+    read:   ["CREATIVE/**", "*/KNOWLEDGE/**"]
+    append: ["*/ISSUES/**"]
+
+  # Maintenance. Structurally incapable of altering prose: `meta` everywhere,
+  # `write` only over its own machine state.
+  vault_manager:
+    meta:   ["**"]
+    write:  [".state/**"]
+    config: ["**"]
+    append: ["*/ISSUES/**"]
+    read:   ["**"]
