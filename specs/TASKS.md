@@ -259,18 +259,21 @@ second index that duplicates Obsidian's own. Revisit only if measurement shows
 - ☑ `obsidian_audit` read enforcement — entries filtered by the caller's `read` grants
 - ☑ `obsidian_index` grant gating — gated on **any** grant over the target folder
   (a `meta`-only maintainer must be able to refresh INDEXes)
-- ☑ `obsidian_context` grants + `conventions_ref` — `agent` wired through; payload
-  carries the caller's five grant booleans and the conventions pointer (D7, default
-  `plugin:obsidian-vault`, overridable via `conventions: {skill: ...}`)
+- ☑ `obsidian_context` grants — `agent` wired through; payload carries the
+  caller's five grant booleans. ⚠ The `conventions_ref` pointer shipped here
+  was REMOVED 2026-08-05 (D1, skill split — see TASKS-skill-split.md): context
+  is folder-scoped; the writing rules live in the role's skill.
 - ☑ Regression tests per surface — `tests/test_permission_coherence.py` (16 tests:
-  ISSUES restriction, graph/audit/index enforcement, context grants + pointer)
+  ISSUES restriction, graph/audit/index enforcement, context grants; the pointer
+  tests were deleted with D1)
 
 Found and fixed during the phase:
 - `any_grant` was added to `Grants` but handlers hold a `RoleRegistry` — moved
   (the registry owns agent-scoped methods)
 - Payload ceiling test had drifted: `engine_options` reference is a documented
   ~2000-char constant (one entry per real option), not the "~400 chars" the old
-  comment claimed — ceiling corrected to 3400 with accurate accounting
+  comment claimed — ceiling corrected to 3400. ⚠ `engine_options` itself was
+  removed 2026-08-05 (D1) — the option list is a discovery call, never context
 
 ### P3.7 — Skill phase (D7/D8/D9) ☑
 *Proves: the missing content layer.* Conventions live in the skill, not the vault (`03` D7).
@@ -283,8 +286,9 @@ fragments; the installer composes a profile-tailored copy into each profile's sk
   (no namespace collision with the new skill)
 - ☑ Bundled skill at `skills/obsidian-vault/` (plugin dir): SKILL.md (cascade +
   tool routing + immutable/mutable split), `references/` (obsidian-formatting,
-  tool-protocol), `templates/vault-conventions.md`, `conventions/`
-  (contributor.md, manager.md fragments)
+  tool-protocol), `templates/vault-conventions.md`. ⚠ Superseded 2026-08-05 by
+  the skill split (TASKS-skill-split.md): two role-owned skills at
+  `skills/note-taking/`; role-directive fragments abolished.
 - ☑ `ctx.register_skill("obsidian-vault", …)` in `register()` — pre-install
   fallback + immutable source; smoke test asserts the bundle ships
 - ☑ `scripts/setup.py` — compose_skill (base+contributor, +manager for manager
@@ -535,26 +539,27 @@ and grows cleanly.
   only content-identical stale copies from pre-P5a installs are replaced by
   symlinks. SKILL.md is engine-owned — any real file there is a stale
   composed variant, always replaced
-- ☑ Role alignment: re-installing a former manager profile as a contributor
-  drops the stale `manager.md`; `contributor.md` is never touched
+- ☑ Role alignment: ⚠ now skill-level (2026-08-05 split) — re-installing a
+  profile with a different role removes the other role's skill symlinks; the
+  maintained conventions file is never touched
 - ☑ Base SKILL.md updated: routing table gains the 4 P4 tools
   (`obsidian_issue`/`_resolve`/`_list`, `obsidian_maintain`); "immutable vs
-  mutable" rewritten for the overlay; new **Role routing** section
-  (contributor → contributor.md, manager → +manager.md, one-profile → both);
-  stale "appended here by the installer" text removed
+  mutable" rewritten for the overlay; new **role → skill** mapping
+  (contributor → obsidian-vault, manager → obsidian-vault-management, one-profile
+  → both, 2026-08-05); stale "appended here by the installer" text removed
 - ☑ `compose_skill` deleted — composition is replaced by routing; the
   composed-profile-copy model is gone
 - ☑ Tests: +9 overlay tests (symlink base, seed conventions, survival
   regression, seed-if-missing, stale-copy → symlink, COW preserved,
-  manager.md removal), −5 dead compose tests — **217 green**
+  other-skill symlink removal), −5 dead compose tests — **217 green**
 - ☑ Live migration (installer re-run = source of truth, P3.7e): all 5
   profiles (`default`, `vault-manager`, `creative`, `dev`, `researcher`)
   re-installed as overlays. Live `references/` were stale Aug-3 copies
   (tool-protocol.md predated the P4 rows) — verified zero custom files, so
   replaced by symlinks (lost nothing). Final state per profile:
   SKILL.md/references/templates symlinks ✓, conventions/ real dir ✓,
-  conv files: contributors `[contributor.md]`, vault-manager
-  `[contributor.md, manager.md]`. `skill_view('obsidian-vault')` resolves
+  conv files: contributors `[<vault>-conventions.md]` (split: the only
+  maintained file), vault-manager none. `skill_view('obsidian-vault')` resolves
   the live symlinked skill end-to-end
 - ⚠ Migration note: `_identical_dir` (COW guard) cannot distinguish a stale
   pre-P5a copy from a deliberate edit — both are non-identical. The
@@ -611,26 +616,18 @@ and grows cleanly.
   **2026-08-04 corrections → 238 green** (role-based install_skill tests:
   manager gets manager.md ONLY, contributor.md removed on promotion,
   maintained-conventions survival + directive refresh)
-- ☑ **Conventions model (2026-08-04 correction, Davide):** `contributor.md`
-  and `manager.md` are **immutable role directives** — refreshed from the
-  bundle on every installer run, never per-profile grown. The maintained,
-  growing file is `conventions/<vault>-conventions.md`, created per
-  vault/domain from `templates/vault-conventions.md`, registered in the
-  SOUL Convention manifest, **never touched by the installer** (the
-  survival guarantee belongs to this file now). Process documented in
-  `contributor.md`, referenced in the skill
-- ☑ **Manager is not a contributor (2026-08-04 correction, verified against
-  grants+duties):** `install_skill` is role-based (`contributor|manager|
-  combined` via `ROLE_FRAGMENTS`); a manager profile holds `manager.md`
-  ONLY — its grants (meta/config/read, no content write) need none of the
-  authoring discipline. Role alignment is symmetric (promotion drops
-  contributor.md, demotion drops manager.md). SKILL.md role routing updated:
-  manager reads manager.md only; `conventions/contributor.md` stays out of
-  manager profiles
+- ⚠ **Conventions model — SUPERSEDED 2026-08-05 by the skill split**
+  (TASKS-skill-split.md): role directives (`contributor.md` / `manager.md`)
+  are abolished; each role owns its skill (`obsidian-vault` /
+  `obsidian-vault-management`); the maintained file is
+  `conventions/<vault>-conventions.md`, created from the template by the
+  growth protocol, never touched by the installer. "Manager is not a
+  contributor" still holds — a manager gets the management skill only and
+  does not maintain conventions
 - ☑ Live: SOUL sections written for all 5 profiles (manager variant on
   vault-manager only), bundle references symlink-propagate to every profile
-  copy automatically (P5a overlay); 2026-08-04 re-run: vault-manager's
-  stale contributor.md removed, all SOULs upgraded to the `## Vault` form
+  copy automatically (P5a overlay); 2026-08-04 re-run: all SOULs upgraded to
+  the `## Vault` form (2026-08-05: refreshed again for the split)
 
 #### P5c — Growth protocol ☑
 *Proves: the vault grows through mechanical, tested commands — the agent
@@ -696,10 +693,10 @@ LLM-improvised. **Complete 2026-08-05.** 287-test suite (286 + P5d).*
   existing owner" path is deleted; one shared core `_ensure_agent_block`
   (extend-or-append, comment-preserving, idempotent) serves setup +
   growth
-- ☑ **`conventions_ref` is role-aware** (vault/context.py): lists
-  `manager.md` and/or `contributor.md` by the calling profile's actual
-  grants (scope-based: manager = meta/config at root `**`; contributor =
-  write over non-machinery paths; append-only does not qualify)
+- ⚠ **`conventions_ref` role-awareness — REMOVED 2026-08-05 (D1, skill
+  split)**: the pointer and its directives list are gone; context is
+  folder-scoped (grants, schema, tags), the option list is a discovery
+  call (`obsidian_reference`)
 - ☑ **Naming unified:** preset is `standard|blank` everywhere — the
   legacy `default` preset name, the `--preset/--manager/--yes` flags, and
   the interactive flow are gone; scaffold rejects unknown presets

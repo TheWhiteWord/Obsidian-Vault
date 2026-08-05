@@ -277,11 +277,15 @@ class TestRunSetup:
         assert "SETUP:done" in out or "combined" in out
         # vault scaffolded
         assert (vault / ".vault" / "roles.yaml").is_file()
-        # default got BOTH directives via combined skill role
-        default_conv = (scratch_home / "skills" / "obsidian-vault"
-                        / "conventions")
-        assert (default_conv / "contributor.md").is_file()
-        assert (default_conv / "manager.md").is_file()
+        # default (combined role) got BOTH skills; conventions live on the
+        # contributor skill only
+        default_contrib = (scratch_home / "skills" / "note-taking"
+                           / "obsidian-vault")
+        assert default_contrib.joinpath("SKILL.md").is_symlink()
+        assert (default_contrib / "conventions").is_dir()
+        default_mgr = (scratch_home / "skills" / "note-taking"
+                       / "obsidian-vault-management")
+        assert default_mgr.joinpath("SKILL.md").is_symlink()
         # grants unioned: default holds system + creative + coding globs
         import yaml
         parsed = yaml.safe_load(

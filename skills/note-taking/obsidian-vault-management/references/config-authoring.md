@@ -1,10 +1,10 @@
-# Config authoring — immutable reference
+# Config authoring
 
 How `.vault/config.yaml` files work — alone and together — and what each
 statement does once the engine digests it. Load before writing or editing
 any config, and before asking `obsidian_edit_config` to change one.
-The authoritative option list always lives in `obsidian_reference`; this
-file explains the semantics.
+The authoritative option list lives in `obsidian_reference`; this file
+explains the semantics.
 
 ## 1. Files and inheritance
 
@@ -27,15 +27,14 @@ inherits.
 | `defaults` | Frontmatter defaults applied on write (e.g. `status: draft`, `created: "@today"`). `@today` is substituted with today's date. |
 | `tags` | `mode`: `open` (any tag) / `suggest` (warn on new) / `closed` (block non-canonical). |
 | `validation` | `fields: blocking` (default) / `advisory`; `tags: advisory` (default) / `blocking`. |
-| `vocabulary` | Promotion thresholds (`promote_after_uses`): observed → declared. |
-| `paths` | Relocate machine state (e.g. `state: SOME/FOLDER`). Engine-reserved concept. |
-| `conventions` | `skill:` name — which skill owns this vault's writing conventions (D7). |
+| `vocabulary` | Promotion threshold (`promote_after_uses`): observed → declared. |
+| `paths` | Relocate machine state (default: vault-root `.state/`). |
 | `summary_field` | Which field INDEX renders as the one-line summary (e.g. `description`). |
-| `scopes` | Named query scopes (deferred design — check `obsidian_reference`). |
+| `scopes` | Reserved — merged but unused (deferred design). |
 | `status_overrides` / `value_overrides` | Per-class allowed-value maps (generalised: `{field, by, map}`). |
 
-`roles.yaml` is separate, sibling file — grants only; no field schema. Never
-touch it without the `config` grant owner's intent (manager-only by default).
+`roles.yaml` is a separate sibling file — grants only, no field schema. It is
+changed by the growth protocol, never by hand.
 
 ## 3. Per-field keys and their merge rules
 
@@ -58,7 +57,6 @@ fields:
 | `allowed_only` | **replace** — child's list *is* the vocabulary; marks `restricted` | narrows the field to exactly these values (e.g. `allowed_only: [knowledge]`) |
 | `required` | **accumulate only** — a child may add, never drop (`ConfigError` if it tries) | makes a field mandatory for future notes |
 | `multi` / `format` | **immutable** once any ancestor sets them (uniformity contract) | shape of the value cannot drift down the tree |
-| `default` | child wins | applied on write |
 | `vocabulary: true` | flag | the field participates in declared/observed/unused tracking |
 
 `allowed` and `allowed_only` are mutually exclusive per field block; both
@@ -70,7 +68,7 @@ target the same `allowed` slot in the resolved config.
 |---|---|
 | `obsidian_write` | `fields` + `validation.fields: blocking` refuse non-conforming notes with structured errors + `did_you_mean`; `required` gates the write; `defaults` pre-fill frontmatter |
 | `obsidian_context` | returns the **resolved** schema, vocabulary, tags, your grants for the folder — the ground truth you write against |
-| `obsidian_search` / `obsidian_graph` | vocabulary fields and `allowed` shape what matches; grant intersection (not config) bounds results — config never widens what you can read |
+| `obsidian_search` / `obsidian_graph` | vocabulary field values are searchable (frontmatter surface); config never widens what you can read — grants bound results |
 | INDEX / registry | `summary_field` surfaces as the one-line note summary; vocabulary fields drive the tag cloud; malformed notes are flagged |
 | `obsidian_maintain` | observed values past `promote_after_uses` become declared (config grant, AUTO); unused declared values are flagged |
 | `tags.mode` / `validation.tags` | open/suggest/closed gates how strict tag checks are at write time |
@@ -89,7 +87,7 @@ agent can *read* (that is grants, deny-by-default).
 **Must not:**
 - Hand-edit raw YAML config files — the tools exist precisely to keep config engine-digestible and audit-trailed.
 - Drop an inherited `required`, redefine `format`/`multi`, or remove a field — `ConfigError` and refused.
-- Touch `roles.yaml` or root `.vault/` without the manager (contributor globs cannot reach them anyway).
+- Hand-edit `roles.yaml` — your config grant never covers it; the growth protocol changes it.
 - Write an issue as a note, or a note where the schema says otherwise (type/kind are enforced).
 
 ## 6. Anchor examples (from the starter)
@@ -110,10 +108,13 @@ defaults:
   created: "@today"
 tags: {mode: suggest}
 validation: {fields: blocking, tags: advisory}
+paths: {state: .state}
+summary_field: description
+vocabulary: {promote_after_uses: 3}
 ```
 
-**KNOWLEDGE config** — restrictive; the §3.6 inheritance case (`allowed_only`
-replaces, `required` accumulates):
+**The shared `*/knowledge` schema** — restrictive; the inheritance proving
+case (`allowed_only` replaces, `required` accumulates):
 
 ```yaml
 fields:

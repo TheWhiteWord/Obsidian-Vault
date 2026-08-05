@@ -25,89 +25,98 @@ assert BUNDLED.is_dir(), "bundled skill missing — installer has nothing to ove
 
 # --- bundle base -----------------------------------------------------------
 
-def test_bundle_skill_is_shared_base():
-    """The bundle SKILL.md is the shared base: cascade + routing (incl. the
-    P4 tools) + role routing. No per-role composition lives in the bundle."""
+def test_bundle_skill_is_contributor_base():
+    """The contributor bundle SKILL.md: writing loop + contributor tools.
+    No manager tool routing, no conventions_ref, no role routing (the split
+    owns the role)."""
     text = (BUNDLED / "SKILL.md").read_text(encoding="utf-8")
     assert "obsidian_context" in text
-    assert "conventions_ref" in text
-    assert "## Role routing" in text
-    assert "obsidian_maintain" in text          # P4 tools routed
     assert "obsidian_issue_list" in text
+    assert "conventions_ref" not in text
+    assert "obsidian_maintain" not in text
+    assert "## Role routing" not in text
+
+
+def test_manager_bundle_skill():
+    """The manager bundle SKILL.md: management loop + manager tools."""
+    mgr = BUNDLED.parent / "obsidian-vault-management" / "SKILL.md"
+    text = mgr.read_text(encoding="utf-8")
+    assert "obsidian_maintain" in text
+    assert "obsidian_issue_list" in text
+    assert "conventions_ref" not in text
 
 
 # --- install_skill (P5a overlay) -------------------------------------------
 
-def test_install_skill_symlinks_base(tmp_path):
-    """SKILL.md, references/, templates/ become symlinks to the bundle."""
-    target = installer.install_skill(tmp_path, role="manager")
-    assert target.joinpath("SKILL.md").is_symlink()
-    assert target.joinpath("SKILL.md").resolve() == (BUNDLED / "SKILL.md").resolve()
+def test_install_skills_symlinks_base(tmp_path):
+    """Each role's skill dir symlinks to its own bundle (the split)."""
+    targets = installer.install_skills(tmp_path, role="contributor")
+    assert len(targets) == 1
+    contrib = targets[0]
+    assert contrib == tmp_path / "note-taking" / "obsidian-vault"
+    assert contrib.joinpath("SKILL.md").is_symlink()
+    assert contrib.joinpath("SKILL.md").resolve() == (BUNDLED / "SKILL.md").resolve()
     for sub in ("references", "templates"):
-        link = target / sub
+        link = contrib / sub
         assert link.is_symlink()
         assert link.resolve() == (BUNDLED / sub).resolve()
 
+    mgr_targets = installer.install_skills(tmp_path / "mgr", role="manager")
+    assert len(mgr_targets) == 1
+    mgr = mgr_targets[0]
+    assert mgr == tmp_path / "mgr" / "note-taking" / "obsidian-vault-management"
+    assert mgr.joinpath("SKILL.md").resolve() == \
+        (installer.MANAGER_SKILL / "SKILL.md").resolve()
 
-def test_install_skill_seeds_conventions(tmp_path):
-    """conventions/ is a real dir; role directives seeded per role (P5a +
-    2026-08-04 correction): contributor gets contributor.md only; manager
-    gets manager.md ONLY (a manager is not a contributor); combined gets
-    both."""
-    contrib = installer.install_skill(tmp_path, role="contributor")
+
+def test_install_skills_combined_installs_both(tmp_path):
+    """A one-profile setup (combined) holds both skills."""
+    targets = installer.install_skills(tmp_path, role="combined")
+    assert sorted(t.name for t in targets) == \
+        ["obsidian-vault", "obsidian-vault-management"]
+    for t in targets:
+        assert t.joinpath("SKILL.md").is_symlink()
+
+
+def test_install_skills_conventions_dir(tmp_path):
+    """Only the contributor skill carries a real conventions/ dir — the
+    maintained file's home. The manager skill has none (2026-08-05)."""
+    contrib = installer.install_skills(tmp_path, role="contributor")[0]
     conv = contrib / "conventions"
     assert conv.is_dir() and not conv.is_symlink()
-    assert (conv / "contributor.md").is_file()
-    assert not (conv / "manager.md").exists()
 
-    mgr = installer.install_skill(tmp_path / "mgr", role="manager")
-    assert (mgr / "conventions" / "manager.md").is_file()
-    assert not (mgr / "conventions" / "contributor.md").exists()
+    mgr = installer.install_skills(tmp_path / "mgr", role="manager")[0]
+    assert not (mgr / "conventions").exists()
 
-    both = installer.install_skill(tmp_path / "both", role="combined")
-    assert (both / "conventions" / "contributor.md").is_file()
-    assert (both / "conventions" / "manager.md").is_file()
+    both = installer.install_skills(tmp_path / "both", role="combined")
+    contrib2 = next(t for t in both if t.name == "obsidian-vault")
+    mgr2 = next(t for t in both if t.name == "obsidian-vault-management")
+    assert (contrib2 / "conventions").is_dir()
+    assert not (mgr2 / "conventions").exists()
 
 
-def test_install_skill_never_touches_bundled(tmp_path):
+def test_install_skills_never_touches_bundled(tmp_path):
     bundled_before = (BUNDLED / "SKILL.md").read_text(encoding="utf-8")
-    installer.install_skill(tmp_path, role="contributor")
+    installer.install_skills(tmp_path, role="contributor")
     assert (BUNDLED / "SKILL.md").read_text(encoding="utf-8") == bundled_before
 
 
 def test_maintained_conventions_survive_rerun(tmp_path):
     """The survival regression (2026-08-04 model): the maintained file is
     `<vault>-conventions.md` — the installer never touches it, so a planted
-    convention survives a re-install. Role directives ARE refreshed."""
-    target = installer.install_skill(tmp_path, role="contributor")
+    convention survives a re-install."""
+    target = installer.install_skills(tmp_path, role="contributor")[0]
     planted = target / "conventions" / "TWW-conventions.md"
     planted.write_text("# my accumulated conventions\n", encoding="utf-8")
 
-    installer.install_skill(tmp_path, role="contributor")  # re-run
+    installer.install_skills(tmp_path, role="contributor")  # re-run
 
     assert planted.read_text(encoding="utf-8") == "# my accumulated conventions\n"
 
 
-def test_role_directives_refreshed_from_bundle(tmp_path):
-    """contributor.md/manager.md are immutable role directives (2026-08-04):
-    a customised copy is overwritten by the bundle version on re-run; the
-    maintained <vault>-conventions.md is never touched."""
-    target = installer.install_skill(tmp_path, role="contributor")
-    directive = target / "conventions" / "contributor.md"
-    directive.write_text("# customised directive\n", encoding="utf-8")
-    maintained = target / "conventions" / "TWW-conventions.md"
-    maintained.write_text("# my rules\n", encoding="utf-8")
-
-    installer.install_skill(tmp_path, role="contributor")
-
-    assert directive.read_text(encoding="utf-8") != "# customised directive\n"
-    assert "# Contributor conventions" in directive.read_text(encoding="utf-8")
-    assert maintained.read_text(encoding="utf-8") == "# my rules\n"
-
-
 def _pre_p5a_install(tmp_path: Path) -> Path:
     """Simulate a pre-P5a install: a real copy of the whole bundle dir."""
-    target = tmp_path / "obsidian-vault"
+    target = tmp_path / "note-taking" / "obsidian-vault"
     shutil.copytree(BUNDLED, target)
     return target
 
@@ -116,8 +125,8 @@ def test_stale_copy_replaced_by_symlink(tmp_path):
     """A content-identical pre-P5a copy is replaced by symlinks; conventions/
     survives as a real dir."""
     _pre_p5a_install(tmp_path)
-    installer.install_skill(tmp_path, role="contributor")
-    target = tmp_path / "obsidian-vault"
+    installer.install_skills(tmp_path, role="contributor")
+    target = tmp_path / "note-taking" / "obsidian-vault"
     assert target.joinpath("SKILL.md").is_symlink()
     assert (target / "references").is_symlink()
     assert (target / "templates").is_symlink()
@@ -128,33 +137,36 @@ def test_cow_reference_dir_preserved(tmp_path):
     """A modified real references/ dir is the copy-on-write escape hatch
     (06-growth-design §2.3) — the installer leaves it alone."""
     _pre_p5a_install(tmp_path)
-    target = tmp_path / "obsidian-vault"
+    target = tmp_path / "note-taking" / "obsidian-vault"
     (target / "references" / "custom.md").write_text("custom", encoding="utf-8")
-    installer.install_skill(tmp_path, role="contributor")
+    installer.install_skills(tmp_path, role="contributor")
     assert not (target / "references").is_symlink()
     assert (target / "references" / "custom.md").is_file()
 
 
-def test_manager_md_removed_when_not_manager(tmp_path):
-    """Re-installing a former manager profile as a contributor drops the stale
-    manager.md (role alignment; contributor.md is never touched)."""
-    installer.install_skill(tmp_path, role="manager")
-    mgr_md = tmp_path / "obsidian-vault" / "conventions" / "manager.md"
-    assert mgr_md.is_file()
-    installer.install_skill(tmp_path, role="contributor")
-    assert not mgr_md.exists()
-    assert (tmp_path / "obsidian-vault" / "conventions" / "contributor.md").is_file()
+def test_install_skills_role_alignment_drops_other_skill(tmp_path):
+    """A contributor promoted to manager loses the contributor skill's
+    surface; the manager skill appears (2026-08-05 skill-level alignment)."""
+    installer.install_skills(tmp_path, role="contributor")
+    contrib = tmp_path / "note-taking" / "obsidian-vault"
+    assert contrib.joinpath("SKILL.md").is_symlink()
+
+    installer.install_skills(tmp_path, role="manager")
+    assert not contrib.joinpath("SKILL.md").exists()  # surface removed
+    mgr = tmp_path / "note-taking" / "obsidian-vault-management"
+    assert mgr.joinpath("SKILL.md").is_symlink()
 
 
-def test_contributor_md_removed_when_becomes_manager(tmp_path):
-    """The reverse role alignment: a former contributor promoted to manager
-    drops contributor.md (a manager is not a contributor — 2026-08-04)."""
-    installer.install_skill(tmp_path, role="contributor")
-    conv = tmp_path / "obsidian-vault" / "conventions"
-    assert (conv / "contributor.md").is_file()
-    installer.install_skill(tmp_path, role="manager")
-    assert not (conv / "contributor.md").exists()
-    assert (conv / "manager.md").is_file()
+def test_install_skills_alignment_preserves_conventions(tmp_path):
+    """Role alignment never deletes the maintained conventions file: the
+    contributor skill's conventions/ survives a manager transition."""
+    installer.install_skills(tmp_path, role="contributor")
+    conv = tmp_path / "note-taking" / "obsidian-vault" / "conventions"
+    (conv / "TWW-conventions.md").write_text("# rules\n", encoding="utf-8")
+
+    installer.install_skills(tmp_path, role="manager")
+
+    assert (conv / "TWW-conventions.md").read_text(encoding="utf-8") == "# rules\n"
 
 
 # --- profile_home -----------------------------------------------------------
@@ -388,34 +400,39 @@ def test_soul_sections_contributor_has_four_lean_sections(tmp_path):
     assert "references/issues.md" in text
     # Contributor must NOT see the sweep as its job.
     assert "obsidian_maintain" not in text
-    # Manifest starts empty-but-directed; role directive is immutable.
-    assert "conventions/contributor.md" in text
+    # Manifest starts empty-but-directed; no role directives exist anymore.
+    assert "conventions/contributor.md" not in text
     assert "conventions/manager.md" not in text
     assert "<!-- add:" in text
-    # Maintained conventions point at the per-vault file, not contributor.md.
+    # Maintained conventions point at the per-vault file.
     assert "<vault>-conventions.md" in text
 
 
-def test_soul_sections_manager_sees_sweep_and_manager_md(tmp_path):
+def test_soul_sections_manager_sees_sweep_only(tmp_path):
     soul = tmp_path / "SOUL.md"
     installer.ensure_soul_sections(soul, "manager")
     text = soul.read_text(encoding="utf-8")
     assert "obsidian_maintain" in text
     assert "references/maintenance.md" in text
-    assert "conventions/manager.md" in text
-    # A manager is not a contributor (2026-08-04): no contributor.md, no
-    # per-vault convention maintenance.
+    # A manager is not a contributor (2026-08-05): no conventions sections,
+    # no manifest, no per-vault convention maintenance.
     assert "conventions/contributor.md" not in text
+    assert "conventions/manager.md" not in text
+    assert "### Convention manifest" not in text
     assert "<vault>-conventions.md" not in text
 
 
-def test_soul_sections_combined_has_both(tmp_path):
+def test_soul_sections_combined_dedicated_text(tmp_path):
     soul = tmp_path / "SOUL.md"
     installer.ensure_soul_sections(soul, "combined")
     text = soul.read_text(encoding="utf-8")
     assert "obsidian_maintain" in text
-    assert "conventions/manager.md" in text
     assert "references/issues.md" in text
+    # Dedicated combined text: the dual role stated once, conventions kept.
+    assert "Dual role" in text
+    assert "<vault>-conventions.md" in text
+    assert "conventions/manager.md" not in text
+    assert "### Convention manifest" in text
 
 
 def test_soul_sections_anchor_replace_is_idempotent(tmp_path):
@@ -487,9 +504,10 @@ def test_scaffold_blank_creates_only_config(tmp_path):
     agents = yaml.safe_load((root / ".vault" / "roles.yaml").read_text())["agents"]
     assert set(agents) == {"default"}
     assert "vault-manager" not in agents
-    # Conventions pointer still wired (convention layer, not domain policy).
+    # D1 (2026-08-05): no conventions pointer in configs — the writing
+    # rules live in the loaded skill, not in the vault config.
     cfg = (root / ".vault" / "config.yaml").read_text(encoding="utf-8")
-    assert "conventions:" in cfg and "obsidian-vault" in cfg
+    assert "conventions:" not in cfg
 
 
 def test_scaffold_copies_readme(tmp_path):
@@ -552,11 +570,13 @@ def test_scaffold_rerun_preserves_domain_configs(tmp_path):
     assert "# custom" in cfg.read_text(encoding="utf-8")
 
 
-def test_scaffold_wires_conventions_skill(tmp_path):
+def test_scaffold_does_not_wire_conventions(tmp_path):
+    """D1 (2026-08-05): scaffolded configs carry no conventions pointer —
+    the writing rules live in the loaded skill."""
     root = tmp_path / "vault"
     installer.scaffold_vault(root, "standard")
     cfg = (root / ".vault" / "config.yaml").read_text(encoding="utf-8")
-    assert "conventions:" in cfg and "obsidian-vault" in cfg
+    assert "conventions:" not in cfg
 
 
 # --- starter roles globs (regression: they must reach 2-level-deep paths) ---

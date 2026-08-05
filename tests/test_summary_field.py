@@ -55,7 +55,11 @@ class TestDiscovery:
         kinds = {g["key"] for g in describe()["grant_kinds"]}
         assert kinds == {"read", "write", "append", "meta", "config"}
 
-    def test_context_ships_the_reference(self, vault_with_summary):
+    def test_context_does_not_ship_the_reference(self, vault_with_summary):
+        # D1 cleanup (2026-08-05): the option list is a discovery call
+        # (`obsidian_reference`), not folder context — context stays scoped
+        # to the folder, the reference stays one call away.
         ctx = build_context(vault_with_summary, "Projects/Alpha")
-        assert "engine_options" in ctx
-        assert "summary_field" in {o["key"] for o in ctx["engine_options"]["config_options"]}
+        assert "engine_options" not in ctx
+        opts = {o["key"] for o in describe()["config_options"]}
+        assert "summary_field" in opts  # still discoverable via the tool

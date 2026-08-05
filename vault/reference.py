@@ -49,13 +49,78 @@ CONFIG_OPTIONS: List[Dict[str, str]] = [
         ),
     },
     {
-        "key": "conventions.skill",
-        "where": ".vault/config.yaml (root)",
-        "default": "plugin:obsidian-vault",
+        "key": "fields.<name>.required",
+        "where": ".vault/config.yaml → fields.<name>",
+        "default": "false",
         "meaning": (
-            "Skill owning this vault's writing conventions; obsidian_context "
-            "returns it as `conventions_ref` (pointer, never content). "
-            "Default: the plugin's bundled skill."
+            "The field is mandatory for every note in the folder: a write "
+            "missing it is refused with suggestions. Children accumulate — "
+            "a required field can never be dropped down the tree."
+        ),
+    },
+    {
+        "key": "fields.<name>.allowed / allowed_only",
+        "where": ".vault/config.yaml → fields.<name>",
+        "default": "(none)",
+        "meaning": (
+            "The controlled vocabulary for a field. `allowed` unions with "
+            "the parent's list; `allowed_only` replaces it and marks the "
+            "field restricted. Mutually exclusive per field block."
+        ),
+    },
+    {
+        "key": "fields.<name>.multi / format",
+        "where": ".vault/config.yaml → fields.<name>",
+        "default": "false / (none)",
+        "meaning": (
+            "`multi` makes the field a list; `format` constrains the value "
+            "shape (e.g. date). Both are immutable once any ancestor sets "
+            "them (uniformity contract)."
+        ),
+    },
+    {
+        "key": "defaults",
+        "where": ".vault/config.yaml (any folder)",
+        "default": "(none)",
+        "meaning": (
+            "Frontmatter defaults applied on write. `@today` is substituted "
+            "with today's date; children override per key."
+        ),
+    },
+    {
+        "key": "tags.mode",
+        "where": ".vault/config.yaml (any folder)",
+        "default": "suggest",
+        "meaning": (
+            "Tag gate at write time: `open` accepts any tag, `suggest` "
+            "warns on new ones, `closed` blocks non-canonical tags."
+        ),
+    },
+    {
+        "key": "validation",
+        "where": ".vault/config.yaml (any folder)",
+        "default": "fields: blocking, tags: advisory",
+        "meaning": (
+            "Severity for schema violations: `blocking` refuses the write "
+            "with field errors, `advisory` warns. Configurable per surface "
+            "(fields / tags)."
+        ),
+    },
+    {
+        "key": "vocabulary.promote_after_uses",
+        "where": ".vault/config.yaml (root)",
+        "default": "3",
+        "meaning": (
+            "How many uses promote an observed value to declared. The "
+            "maintenance sweep applies the promotion (config grant)."
+        ),
+    },
+    {
+        "key": "scopes",
+        "where": ".vault/config.yaml",
+        "default": "(none)",
+        "meaning": (
+            "Reserved — merged but unused (deferred design)."
         ),
     },
     {

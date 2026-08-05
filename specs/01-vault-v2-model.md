@@ -531,8 +531,8 @@ about any other folder. ~300 tokens against ~3,000 for the v1 read-the-docs path
 The `grants` row is the caller's effective rights in this folder — five booleans
 (`read`/`write`/`append`/`meta`/`config`), **shipped in P3.6**. An agent learns
 whether it may act *before* being refused; a zero-grant agent gets an all-false row
-and no siblings (D2). The payload also carries `conventions_ref` (D7) — a pointer to
-the skill that owns writing procedure, never the content.
+and no siblings (D2). Writing rules live in the role's skill (D7) — the engine
+never embeds convention content in the payload.
 
 Note the vocabulary arrives **scoped and split** (§3.7): only this domain's values,
 with `declared` and `observed` distinguished so the agent can prefer settled terms.

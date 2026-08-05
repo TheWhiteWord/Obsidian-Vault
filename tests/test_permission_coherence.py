@@ -180,64 +180,14 @@ class TestContextGrantsAndConventions:
         assert out_domain["grants"]["write"] is False
         assert out_domain["grants"]["read"] is False
 
-    def test_conventions_ref_defaults_to_bundled_skill(self, vault):
-        ctx = build_context(vault, "CREATIVE")
-        assert ctx["conventions_ref"] == {"skill": "plugin:obsidian-vault"}
-
-    def test_conventions_ref_honours_config_override(self, vault):
-        (vault / ".vault/config.yaml").write_text(
-            (vault / ".vault/config.yaml").read_text()
-            + "\nconventions:\n  skill: my-vault-skill\n",
-            encoding="utf-8")
-        ctx = build_context(vault, "CREATIVE")
-        assert ctx["conventions_ref"] == {"skill": "my-vault-skill"}
-
     def test_context_through_handler_carries_grants(self, vault_with_roles):
         out = json.loads(plugin._handle_context({
             "folder": "CREATIVE", "vault": str(vault_with_roles),
             "agent": "tww"}))
         assert out["grants"]["write"] is True
-        # tww authors CREATIVE content → contributor directive only.
-        assert out["conventions_ref"] == {
-            "skill": "plugin:obsidian-vault",
-            "directives": ["conventions/contributor.md"],
-        }
-
-    def test_conventions_ref_manager_only(self, vault_with_roles, roles):
-        # vault_manager: meta/config at root, write only on .state (machinery).
-        # Root meta/config → manager directive; machinery write is NOT
-        # authorship → no contributor directive.
-        ctx = build_context(vault_with_roles, "CREATIVE",
-                            agent="vault_manager", roles=roles)
-        assert ctx["conventions_ref"] == {
-            "skill": "plugin:obsidian-vault",
-            "directives": ["conventions/manager.md"],
-        }
-
-    def test_conventions_ref_combined_both_directives(self, vault_with_roles, roles):
-        # A one-profile setup holds content write AND root meta/config →
-        # both directives, referenced together (2026-08-05).
-        (vault_with_roles / ".vault/roles.yaml").write_text(
-            (vault_with_roles / ".vault/roles.yaml").read_text()
-            + "\n  combined:\n"
-            + "    write:  [\"work/creative/**\"]\n"
-            + "    meta:   [\"**\"]\n"
-            + "    config: [\"**\"]\n"
-            + "    read:   [\"**\"]\n",
-            encoding="utf-8")
-        roles = load_roles(vault_with_roles)
-        ctx = build_context(vault_with_roles, "CREATIVE",
-                            agent="combined", roles=roles)
-        assert ctx["conventions_ref"]["directives"] == [
-            "conventions/contributor.md", "conventions/manager.md",
-        ]
-
-    def test_conventions_ref_unknown_agent_has_no_directives(
-            self, vault_with_roles, roles):
-        # Deny-by-default: an unlisted agent holds nothing → bare pointer.
-        ctx = build_context(vault_with_roles, "CREATIVE",
-                            agent="ghost", roles=roles)
-        assert ctx["conventions_ref"] == {"skill": "plugin:obsidian-vault"}
+        # D1 (2026-08-05): no conventions_ref — the writing rules live in
+        # the loaded skill, not in the tool payload.
+        assert "conventions_ref" not in out
 
     def test_context_without_roles_grants_nothing(self, vault):
         # no roles.yaml → deny by default, all-false row, no crash

@@ -225,7 +225,7 @@ def _merge_delta_into_raw(raw: Dict[str, Any], delta: Dict[str, Any]) -> Dict[st
             else:
                 block[key] = value
     for section in ("defaults", "tags", "validation", "vocabulary",
-                    "paths", "conventions"):
+                    "paths"):
         for key, value in (delta.get(section) or {}).items():
             merged.setdefault(section, {})[key] = value
     if "summary_field" in delta:

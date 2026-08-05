@@ -12,19 +12,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .config import ResolvedConfig, resolve_config
-from .constants import (CONFIG_DIRNAME, STATE_DIRNAME, TODAY_TOKEN,
-                        VOCABULARY_FLAG)
+from .constants import TODAY_TOKEN, VOCABULARY_FLAG
 from .grants import GRANT_KINDS, RoleRegistry
 from .notes import Note, derive_tags, derive_vocabulary, iter_notes
 from .paths import relative_to_vault, safe_join
-from .reference import describe
 
 logger = logging.getLogger(__name__)
-
-#: The bundled skill that owns writing procedure for this plugin. A vault may
-#: override the pointer via root config ``conventions: {skill: ...}``; the
-#: engine only ever returns the pointer (D7), never the content.
-DEFAULT_CONVENTIONS_SKILL = "plugin:obsidian-vault"
 
 
 def _vocab_compact(vocab: Dict[str, Any]) -> Dict[str, Any]:
@@ -89,75 +82,6 @@ def _template(cfg: ResolvedConfig) -> str:
     return "\n".join(lines)
 
 
-def _is_machinery_only(pattern: str) -> bool:
-    """True when a grant pattern can only ever match engine machinery.
-
-    Machinery dirs are ``.state`` (audit ledger, state dirname) and
-    ``.vault`` (config discovery). A pattern scoped to either is
-    maintenance plumbing, not content authorship — the manager's
-    ``write: [".state/**"]`` (ledger maintenance) must not label it a
-    contributor, while ``write: ["work/creative/**"]`` is real authorship.
-    """
-    p = pattern.strip("/")
-    return (p in (STATE_DIRNAME, CONFIG_DIRNAME)
-            or p.startswith(STATE_DIRNAME + "/")
-            or p.startswith(CONFIG_DIRNAME + "/"))
-
-
-def _role_directives(roles: Any, agent: str) -> List[str]:
-    """Which role-directive files apply to this agent, derived from grants.
-
-    The reference must be *derived from what the profile actually holds*,
-    never blanket-listed: a profile gets a directive only for the roles its
-    grants prove (2026-08-05, Davide: ``conventions_ref`` must reference
-    both directives only when the calling profile holds both roles).
-
-    - contributor.md — the agent authors and maintains content: holds
-      ``write`` over a non-machinery path (machinery-only patterns are
-      excluded — see :func:`_is_machinery_only`). ``append`` (create-only
-      record-raising) is not authorship and does not qualify.
-    - manager.md — the agent holds ``meta``/``config`` at the vault ROOT.
-      Scope is the discriminator: a contributor's ``config`` is scoped to
-      its own tree (D-5, e.g. ``work/creative/**``) and never matches the
-      root; the manager's ``**`` patterns always do. A one-profile setup
-      acting as both holds content write *and* root meta/config, so it
-      gets both.
-    """
-    try:
-        grants = roles.get(agent)
-    except Exception:
-        return []
-    out: List[str] = []
-    if any(not _is_machinery_only(p) for p in grants.globs("write")):
-        out.append("conventions/contributor.md")
-    if grants.matches("meta", ".") or grants.matches("config", "."):
-        out.append("conventions/manager.md")
-    return out
-
-
-def _conventions_ref(cfg: ResolvedConfig,
-                     agent: Optional[str] = None,
-                     roles: Optional[Any] = None) -> Dict[str, Any]:
-    """Where the writing rules for this vault live (D7 — pointer, not content).
-
-    Defaults to the plugin's bundled skill; a vault may redirect via
-    ``conventions: {skill: ...}`` in root config. When the caller's identity
-    is known (agent + roles), the pointer also names the role-directive
-    files that apply to *this* profile — one, the other, or both, derived
-    from its grants. The tool never inlines the conventions themselves —
-    the agent loads the skill it already knows.
-    """
-    ref: Dict[str, Any] = {
-        "skill": (cfg.conventions or {}).get("skill")
-        or DEFAULT_CONVENTIONS_SKILL,
-    }
-    if agent is not None and roles is not None:
-        directives = _role_directives(roles, agent)
-        if directives:
-            ref["directives"] = directives
-    return ref
-
-
 def _grants_row(roles: RoleRegistry, agent: str, rel: str) -> Dict[str, bool]:
     """The caller's effective grants in one folder, as booleans.
 
@@ -185,7 +109,7 @@ def build_context(
 
     When ``agent`` + ``roles`` are given, the payload also carries the
     caller's ``grants`` row (write/read/meta/config/append booleans for this
-    folder) and the ``conventions_ref`` pointer (D7).
+    folder).
     """
     vault_root = Path(vault_root).resolve()
     target = safe_join(vault_root, folder)
@@ -244,13 +168,11 @@ def build_context(
         "config_sources": [
             str(p.relative_to(vault_root)) for p in cfg.sources
         ],
-        "engine_options": describe(),
     }
 
     if agent is not None and roles is not None:
         rel = relative_to_vault(vault_root, target)
         payload["grants"] = _grants_row(roles, agent, rel)
-    payload["conventions_ref"] = _conventions_ref(cfg, agent, roles)
 
     if len(notes) > max_siblings:
         payload["siblings_truncated"] = len(notes) - max_siblings

@@ -248,7 +248,7 @@ What remains for later (recorded, never designed from zero):
 
 Cron cadence: **daily `maintain`** (delta always first), **weekly
 `optimize`** — confirmed with Davide. The vault-manager profile invokes it on
-schedule; its skill (`manager.md`) holds judgment + escalation rules.
+schedule; its skill (`obsidian-vault-management`) holds judgment + escalation rules.
 
 ---
 

@@ -26,26 +26,34 @@ This document designs how the vault **grows** after installation: what a profile
 
 ### 2.1 Symlink map
 
-Per-profile skill dir (`<profile>/skills/obsidian-vault/`):
+Per-profile skill dir — `<profile>/skills/note-taking/` (2026-08-05 split:
+two role-owned skills; `obsidian-vault` = contributor, `obsidian-vault-management`
+= manager; a one-profile setup holds both):
 
-| Entry | Type | Source |
-|---|---|---|
-| `SKILL.md` | symlink → bundle | immutable, update-propagating |
-| `references/` | symlink → bundle | immutable, update-propagating |
-| `templates/` | symlink → bundle | immutable, update-propagating |
-| `conventions/contributor.md` | real file, **refreshed from bundle each run** | immutable role directive (contributor profiles + combined) |
-| `conventions/manager.md` | real file, **refreshed from bundle each run** | immutable role directive (manager + combined) |
-| `conventions/<vault>-conventions.md` | real file, **never touched by the installer** | maintained per-vault/domain conventions (contributors only) |
+| Skill | Entry | Type | Source |
+|---|---|---|---|
+| obsidian-vault (contributor) | `SKILL.md`, `references/`, `templates/` | symlinks → bundle | immutable, update-propagating |
+| obsidian-vault (contributor) | `conventions/` | real dir | home of the maintained file |
+| obsidian-vault (contributor) | `conventions/<vault>-conventions.md` | real file, **never touched by the installer** | maintained per-vault/domain conventions (contributors only) |
+| obsidian-vault-management (manager) | `SKILL.md`, `references/`, `templates/` | symlinks → bundle | immutable, update-propagating |
 
-Invariant: the installer never deletes or overwrites `conventions/<vault>-conventions.md`. Role directives are refreshed (they are immutable, bundle-owned); the maintained file is created by the growth protocol from `templates/vault-conventions.md` and grows through interaction.
+Invariant: the installer never deletes or overwrites
+`conventions/<vault>-conventions.md`. It is created by the growth protocol
+from `templates/vault-conventions.md` and grows through interaction. There
+are **no role directives** — each role's rules live in its skill's SKILL.md
+(the split removed contributor.md / manager.md). Skill-level role alignment
+removes a role's other skill's symlinks, but never touches `conventions/`
+or copy-on-write breaks.
 
-### 2.2 Role routing in base SKILL.md
+### 2.2 Role → skill (the split, 2026-08-05)
 
-The base SKILL.md carries a routing section (composition replaced by routing):
-
-- contributor profile → read `conventions/contributor.md` (role directive) + the `<vault>-conventions.md` files for the domains it manages
-- manager profile → read `conventions/manager.md` only. **A manager is not a contributor** (2026-08-04, verified against grants: meta/config/read, no content write — needs none of the authoring discipline); it does not maintain conventions
-- one-profile combined → read both directives + per-vault convention files
+- contributor profile → `note-taking/obsidian-vault` (the authoring skill: writing
+  loop, formatting, maintained conventions)
+- manager profile → `note-taking/obsidian-vault-management` only. **A manager is
+  not a contributor** (verified against grants: meta/config/read, no content
+  write — needs none of the authoring discipline); it does not maintain
+  conventions
+- one-profile combined → both skills (roles unioned)
 
 ### 2.3 Copy-on-write escape hatch
 
@@ -55,8 +63,10 @@ If a profile must customise a reference (e.g. a profile-specific tool protocol):
 
 - symlinked SKILL.md + references resolve via `skill_view` (probe pattern)
 - conventions survive an installer re-run (the survival regression)
-- conventions seed on first install, never clobber on re-run
-- portability + entrypoint suites stay green (the role-routing section is engine-free prose, but the installer changes are real)
+- `conventions/` dir created on install (contributor skills), the maintained
+  file never seeded, never clobbered on re-run
+- portability + entrypoint suites stay green (role→skill mapping is
+  installer-side; the engine is role-agnostic)
 
 ---
 
@@ -70,32 +80,32 @@ pointer (tools + references), never prose instruction:
 
 1. **`## Vault`** — one-liner: operating this vault — tools, conventions,
    issues, and maintenance; each subsection points at what governs it.
-2. **`### Vault operations`** — the existing paragraph (load the
-   `obsidian-vault` skill first; it routes to tools + conventions).
+2. **`### Vault operations`** — load the role's skill first (the
+   `obsidian-vault` / `obsidian-vault-management` skill); it holds the
+   writing loop / management procedure.
 3. **`### Issues`** — raise via `obsidian_issue`; list via
    `obsidian_issue_list`; resolution is grant-gated. Contributors raise,
    they do not run the maintenance sweep — that is the manager's job
    (`references/maintenance.md`).
-4. **`### Convention maintenance`** — role directives are immutable; the
-   maintained file is `conventions/<vault>-conventions.md`, created per
-   vault/domain from `templates/vault-conventions.md` and registered in the
-   manifest. Managers: no per-vault convention files (contributor process).
+4. **`### Convention maintenance`** — the maintained file is
+   `conventions/<vault>-conventions.md`, created per vault/domain from
+   `templates/vault-conventions.md` and registered in the manifest.
+   Managers: no per-vault convention files (contributor process).
 5. **`### Convention manifest`** — a strict, parseable markdown list of
-   convention files relevant to this profile. Role directives listed as
-   immutable; maintained per-vault files appended by the growth protocol.
-   Starter: empty-but-directed (a header + one commented example).
+   convention files relevant to this profile; maintained per-vault files
+   appended by the growth protocol. Starter: empty-but-directed (a header
+   + one commented example).
 
 ### 3.2 Role variants
 
-Three SOUL templates, each assembled from the four subsections with
-role-appropriate pointers (2026-08-04 correction: manager is NOT a
-contributor — no contributor.md, no per-vault convention maintenance):
+Three SOUL templates, one per skill role (2026-08-04 correction: manager is
+NOT a contributor; 2026-08-05 split: role → skill, no role directives):
 
-| Variant | Subsections | Convention pointers |
+| Variant | Skill | Convention pointers |
 |---|---|---|
-| contributor | all | `conventions/contributor.md` (role directive) + `references/obsidian-formatting.md`, `references/config-authoring.md`; maintained file `<vault>-conventions.md` |
-| manager | all | `conventions/manager.md` (role directive) only + `references/maintenance.md`, `references/issues.md`; no convention maintenance |
-| combined (one-profile) | all | both role directives + per-vault convention files |
+| contributor | `obsidian-vault` | `references/obsidian-formatting.md`, `references/config-authoring.md`; maintained file `<vault>-conventions.md` |
+| manager | `obsidian-vault-management` | `references/maintenance.md`, `references/issues.md`; no convention maintenance |
+| combined (one-profile) | both skills | maintains conventions; dual-role operational bullet ("sweep findings about your own domains are yours to fix; about other domains, raise them") |
 
 All lean; every bullet names a tool or a reference, nothing more.
 

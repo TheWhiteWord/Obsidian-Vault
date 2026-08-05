@@ -170,30 +170,35 @@ vault keeps one), independent of plugin mechanics.
 | Tier | What | Lives where | Editable? |
 |---|---|---|---|
 | **Immutable references** | Obsidian formatting standards, the v2 model summary, the tool-surface protocol | bundled with the plugin via `ctx.register_skill` (namespaced `plugin:obsidian-vault`) | no — versioned with code, same for every vault |
-| **Mutable conventions** | per-profile writing rules, manager processes, setup decisions | per-profile skills area (`~/.hermes/profiles/<name>/skills/...`): `contributor.md`, `manager.md` (merged for single-profile setups) | yes — created at setup, iterated through interaction |
+| **Mutable conventions** | per-profile writing rules grown through interaction | the maintained file `<vault>-conventions.md` in the contributor skill's `conventions/` (per profile), created from the template | yes — created by the growth protocol, iterated through interaction |
 
 The mutable tier **cannot** live in the plugin directory (overwritten on plugin
 update) and **cannot** live in the vault (pollution). It lives beside the skill,
 per profile. The skill names these files as *the place*; it does not own their
 content.
 
-**Pointer, not content.** Tools return a `conventions_ref` (where to look), never
-the content — the agent verifies against the skill it already loaded. The setup
-process writes a small, stable section into the profile's `SOUL.md` directing
-vault tasks to load the skill first, so the agent always knows the skill exists.
+**Skills own the procedure (D7, 2026-08-05).** Each role has its own skill —
+`note-taking/obsidian-vault` for contributors (writing loop, formatting,
+maintained conventions), `note-taking/obsidian-vault-management` for managers
+(sweep, triage, growth). Tools stay content-free: `obsidian_context` is
+folder-scoped (schema, grants, tags, siblings); `obsidian_reference` is the
+option-discovery tool. The setup process writes a small, stable section into
+the profile's `SOUL.md` naming the role's skill, so the agent always knows
+the skill exists.
 
-**Manager + setup.** The manager conventions file holds the setup questionnaire;
-the init verb invokes it, so decisions that shape config values are guided by the
-skill and cannot be forgotten by an agent.
+**Manager + setup.** Setup is the deterministic stage machine
+(`scripts/setup.py --setup`); the manager skill holds maintenance judgment
+and escalation rules.
 
-**Old skill.** `note-taking/obsidian-vault` is v1-legacy (three-tree layout,
-`RESEARCH`, `TAXONOMY.md`, `vault_navigator.py`, `hermes_workspace`) — unrelated
-to the plugin. Archived/renamed at the start of the skill phase to avoid namespace
-confusion with the bundled `plugin:obsidian-vault`.
+**Old skill.** `note-taking/obsidian` is v1-legacy (three-tree layout,
+`RESEARCH`, `TAXONOMY.md`, `vault_navigator.py`, `hermes_workspace`) —
+unrelated to the plugin; the split (2026-08-05) gave the plugin its own
+contributor skill at `note-taking/obsidian-vault`, next to it.
 
 **Consequences**
-- P3.6 drops any HANDBOOK-conventions wiring; `obsidian_context` gains a
-  `conventions_ref` pointer instead.
+- P3.6 dropped HANDBOOK-conventions wiring; D1 (2026-08-05) removed the
+  `conventions_ref` pointer — context is folder-scoped, the reference is a
+  discovery call.
 - Stage C's "rewrite the skill as a 40-line protocol" is superseded by this
   architecture (bundled skill + references + conventions).
 - The skill build is the **skill phase**, after P3.6.

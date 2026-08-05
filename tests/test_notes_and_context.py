@@ -101,9 +101,9 @@ class TestContextCall:
         import json
         size = len(json.dumps(build_context(vault, "CREATIVE/PHILOSOPHY")))
         # The ceiling guards the VARIABLE part of the payload (schema, tags,
-        # siblings) against accidental bloat (e.g. verbose vocabulary objects).
-        # The `engine_options` reference block is a deliberate constant
-        # (~2000 chars, one entry per real engine option — summary_field,
-        # vocabulary, paths.state, value_overrides, conventions.skill) and is
-        # documented, not accidental. 3400 = ~2000 reference + ~1400 variable.
-        assert size < 3400, f"context payload grew to {size} chars"
+        # siblings) against accidental bloat (e.g. verbose vocabulary
+        # objects). The engine's option reference does NOT ride along
+        # (2026-08-05, D1 cleanup): the payload is folder-scoped, and the
+        # option list is a discovery call (`obsidian_reference`) — never
+        # duplicated per context.
+        assert size < 2500, f"context payload grew to {size} chars"

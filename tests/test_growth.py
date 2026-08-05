@@ -63,7 +63,7 @@ def test_ensure_conventions_file_dry_run_creates_nothing(tmp_path):
     hermes, vault = _scratch(tmp_path)
     profile = _profile_dir(hermes, "creative")
     installer.ensure_conventions_file(profile / "skills", vault, dry_run=True)
-    assert not (profile / "skills" / "obsidian-vault" / "conventions").exists()
+    assert not (profile / "skills" / "note-taking" / "obsidian-vault" / "conventions").exists()
 
 
 # --- append_manifest_entry -------------------------------------------------
@@ -205,12 +205,12 @@ def test_add_contributor_installs_overlay_and_soul(tmp_path):
     profile = _profile_dir(hermes, "creative")
     installer.add_contributor(hermes, "creative", vault)
 
-    target = profile / "skills" / "obsidian-vault"
+    target = profile / "skills" / "note-taking" / "obsidian-vault"
     assert (target / "SKILL.md").is_symlink()
     soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
     assert "## Vault" in soul_text
     assert "### Convention manifest" in soul_text
-    assert "conventions/contributor.md" in soul_text
+    assert "<vault>-conventions.md" in soul_text
     assert "conventions/manager.md" not in soul_text
 
 
@@ -245,7 +245,7 @@ def test_add_domain_full_flow(tmp_path):
     assert not registry.allows("creative", "edit", ".vault/roles.yaml")
 
     # Conventions file + manifest entry.
-    conv = (profile / "skills" / "obsidian-vault" / "conventions"
+    conv = (profile / "skills" / "note-taking" / "obsidian-vault" / "conventions"
             / f"{vault.name}-conventions.md")
     assert conv.is_file()
     soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")

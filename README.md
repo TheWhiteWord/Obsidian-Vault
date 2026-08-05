@@ -41,13 +41,13 @@ PATH. Python 3.9+. Nothing else — no running Obsidian, no other services.
 | `standard` | Starter tree (`system/`, `work/creative/`, `work/coding/` + shared `knowledge/`), five agents granted by default | `default` (system owner), `vault-manager`, one contributor per domain, `researcher` | You want a working vault now |
 | `blank` | Bare `.vault/` (five core fields, deny-by-default roles) | `default` + `vault-manager` | You bring your own tree; add domains later |
 
-Every profile gets: the skill overlay (symlinked bundle base + real
-`conventions/`), role-aware SOUL.md sections, a seeded config, the plugin
-enabled, and `OBSIDIAN_VAULT_PATH` / `OBSIDIAN_VAULT_AGENT` in its `.env`.
+Every profile gets: the skill overlay (symlinked bundle base; real
+`conventions/` on contributor skills), role-aware SOUL.md sections, a seeded
+config, the plugin enabled, and `OBSIDIAN_VAULT_PATH` / `OBSIDIAN_VAULT_AGENT`
+in its `.env`.
 
 One-agent setups are allowed: assign every role to a single profile (e.g.
-`default`) and it gets the combined skill role (both directive files) and
-unioned grants.
+`default`) and it gets both skills (combined role) and unioned grants.
 
 ## Growing a live vault
 
@@ -62,7 +62,7 @@ python3 scripts/setup.py --vault <path> --add-domain <DOMAIN> --owner <NAME>
 python3 scripts/setup.py --vault <path> --add-subdomain work/<domain>/<sub> --owner <NAME>
 ```
 
-The interactive reference for these flows: `skills/obsidian-vault/references/growth-protocol.md`.
+The interactive reference for these flows: `skills/note-taking/obsidian-vault/references/growth-protocol.md`.
 
 ## Verifying
 
@@ -80,11 +80,12 @@ The interactive reference for these flows: `skills/obsidian-vault/references/gro
 ## Development
 
 ```bash
-.venv-test/bin/python -m pytest tests/ -q   # the suite (287 tests)
+.venv-test/bin/python -m pytest tests/ -q   # the suite (284 tests)
 ```
 
 Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire +
-growth · `skills/obsidian-vault/` the bundled skill (base + references +
+growth · `skills/note-taking/obsidian-vault/` + `skills/note-taking/
+obsidian-vault-management/` the bundled skills (base + references +
 templates) · `examples/` starter/blank presets · `specs/` design history
 (model, decisions D1–D9, install, maintenance, growth, TASKS) ·
 `reference/` external material.

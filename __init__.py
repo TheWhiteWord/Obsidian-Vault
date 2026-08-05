@@ -368,13 +368,18 @@ def _available() -> bool:
 def register(ctx) -> None:
     from vault import schemas
 
-    # The bundled skill: immutable source for the `obsidian-vault` skill
-    # (tool routing + cascade + references). Install (scripts/setup.py)
-    # composes a profile-tailored copy into each profile's skills/; this
+    # The bundled skills: immutable sources for `obsidian-vault` (contributor)
+    # and `obsidian-vault-management` (manager). Install (scripts/setup.py)
+    # overlays the role-owned skills into each profile's skills/; this
     # registration is the pre-install fallback and the immutable upstream.
-    bundled_skill = _PLUGIN_DIR / "skills" / "obsidian-vault"
-    if bundled_skill.is_dir():
-        ctx.register_skill(name="obsidian-vault", path=str(bundled_skill))
+    contributor_skill = _PLUGIN_DIR / "skills" / "note-taking" / "obsidian-vault"
+    if contributor_skill.is_dir():
+        ctx.register_skill(name="obsidian-vault", path=str(contributor_skill))
+    manager_skill = (_PLUGIN_DIR / "skills" / "note-taking"
+                     / "obsidian-vault-management")
+    if manager_skill.is_dir():
+        ctx.register_skill(name="obsidian-vault-management",
+                           path=str(manager_skill))
 
     handlers = {
         "obsidian_context":       (schemas.OBSIDIAN_CONTEXT, _handle_context, "🗂️"),

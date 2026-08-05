@@ -22,12 +22,12 @@ _AGENT_ARG = {
 }
 
 #: One-line reminder appended to mutating tools (Decision B, P3.7): the tool
-#: never verifies the agent read the conventions — the cascade is assumed to
-#: have worked at skill level. It only points at conventions_ref.
+#: never verifies the agent read the conventions — the writing loop is
+#: assumed to have worked at skill level. It points back at the skill's
+#: writing rules, not at any tool payload.
 _CONVENTIONS_REMINDER = (
-    " `conventions_ref` from obsidian_context points at the skill owning "
-    "this vault's writing conventions; if you have not loaded it, verify the "
-    "note against it before finalizing."
+    " Verify the note against the vault's writing conventions (this "
+    "skill's writing loop) before finalizing."
 )
 
 

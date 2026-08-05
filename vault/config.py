@@ -160,7 +160,7 @@ def merge_configs(configs: List[Dict[str, Any]], sources: List[Path]) -> Dict[st
 
         # shallow-override dict sections
         for key in ("status_overrides", "value_overrides", "vocabulary",
-                    "scopes", "paths", "conventions"):
+                    "scopes", "paths"):
             if key in raw:
                 resolved.setdefault(key, {}).update(raw[key] or {})
 
@@ -187,7 +187,6 @@ class ResolvedConfig:
     vocabulary: Dict[str, Any] = dc_field(default_factory=dict)
     scopes: Dict[str, Any] = dc_field(default_factory=dict)
     paths: Dict[str, Any] = dc_field(default_factory=dict)
-    conventions: Dict[str, Any] = dc_field(default_factory=dict)
     summary_field: Optional[str] = None
     sources: List[Path] = dc_field(default_factory=list)
 
@@ -278,7 +277,6 @@ def resolve_config(vault_root: Path, target: Path) -> ResolvedConfig:
         vocabulary=merged.get("vocabulary", {}),
         scopes=merged.get("scopes", {}),
         paths=merged.get("paths", {}),
-        conventions=merged.get("conventions", {}),
         summary_field=merged.get("summary_field"),
         sources=sources,
     )

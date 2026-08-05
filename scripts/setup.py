@@ -60,7 +60,8 @@ PLUGIN_DIR = Path(os.environ.get(
     "OBSIDIAN_VAULT_PLUGIN",
     str(Path(__file__).resolve().parents[1]),
 ))
-BUNDLED_SKILL = PLUGIN_DIR / "skills" / "obsidian-vault"
+BUNDLED_SKILL = PLUGIN_DIR / "skills" / "note-taking" / "obsidian-vault"
+MANAGER_SKILL = PLUGIN_DIR / "skills" / "note-taking" / "obsidian-vault-management"
 STARTER = PLUGIN_DIR / "examples" / "starter-vault"
 BLANK = PLUGIN_DIR / "examples" / "blank-vault"
 
@@ -82,88 +83,90 @@ def _soul_block(role: str) -> str:
     """The SOUL sections for a role: contributor | manager | combined.
 
     One `## Vault` umbrella with lean `###` subsections (06-growth-design
-    §3.1, corrected 2026-08-04): Vault operations, Issues, Convention
-    maintenance, Convention manifest. Every bullet names a tool or a
-    reference — never prose instruction. The manifest starts
-    empty-but-directed; the growth protocol (P5c) appends entries.
-
-    Conventions model (2026-08-04 correction): `contributor.md` and
-    `manager.md` are immutable ROLE DIRECTIVES, not maintained files. The
-    maintained, growing file is `conventions/<vault>-conventions.md`,
-    created per vault/domain from `templates/vault-conventions.md` and
-    registered in the manifest. The manager does NOT maintain conventions —
-    it holds manager.md only (and is not a contributor; its grants
-    meta/config/read need none of the authoring discipline).
+    §3.1). Every bullet names a tool or a reference — never prose
+    instruction. Contributor and combined carry the convention sections and
+    the manifest; the manifest starts empty-but-directed and the growth
+    protocol (P5c) appends entries. A manager SOUL carries NO conventions
+    sections and NO manifest add-marker — that marker's absence is what
+    makes growth subcommands refuse to touch manager SOULs (conventions are
+    contributor-maintained). Combined is dedicated text, not concatenation:
+    it states the dual role once (2026-08-05).
     """
-    if role == "manager":
-        issues = (
-            "### Issues\n"
-            "- Raise / list / resolve ledger issues: `obsidian_issue`, "
-            "`obsidian_issue_list`, `obsidian_issue_resolve`.\n"
-            "- Run the maintenance sweep: `obsidian_maintain` "
-            "(delta / maintain / optimize). See `references/maintenance.md`.\n"
-        )
-        conventions = (
-            "### Convention maintenance\n"
-            "- `conventions/manager.md` is an immutable role directive. "
-            "Conventions are maintained by contributors, not the manager. "
-            "No per-vault convention files here.\n"
-        )
-        manifest_extra = "- `conventions/manager.md` — role directive (immutable)\n"
-        add_line = "<!-- conventions are contributor-maintained; none to add here -->\n"
-    elif role == "combined":
-        issues = (
-            "### Issues\n"
-            "- Raise / list / resolve ledger issues: `obsidian_issue`, "
-            "`obsidian_issue_list`, `obsidian_issue_resolve`.\n"
-            "- Run the maintenance sweep: `obsidian_maintain`. See "
-            "`references/issues.md`, `references/maintenance.md`.\n"
-        )
-        conventions = (
-            "### Convention maintenance\n"
-            "- `conventions/contributor.md` and `conventions/manager.md` are "
-            "immutable role directives. Maintained conventions live in "
-            "`conventions/<vault>-conventions.md`, created per vault/domain "
-            "from `templates/vault-conventions.md` and registered below.\n"
-        )
-        manifest_extra = (
-            "- `conventions/contributor.md` — role directive (immutable)\n"
-            "- `conventions/manager.md` — role directive (immutable)\n"
-        )
-        add_line = "<!-- add: - `conventions/<vault>-conventions.md` — description (domain) -->\n"
-    else:  # contributor
-        issues = (
+    ops = {
+        "contributor": (
+            "- For any task touching an Obsidian vault, load the "
+            "`obsidian-vault` skill first — it holds the writing loop "
+            "and the conventions.\n"
+        ),
+        "manager": (
+            "- For any task touching an Obsidian vault, load the "
+            "`obsidian-vault-management` skill first — it holds the "
+            "sweep, triage, and growth flows.\n"
+        ),
+        "combined": (
+            "- Author and maintain: load `obsidian-vault` for writing "
+            "rules, `obsidian-vault-management` for the sweep and "
+            "triage.\n"
+        ),
+    }
+    issues = {
+        "contributor": (
             "### Issues\n"
             "- Raise and track ledger issues: `obsidian_issue`, "
-            "`obsidian_issue_list`. You raise; resolution is grant-gated — "
-            "the maintenance sweep is the manager's job. See "
+            "`obsidian_issue_list`, `obsidian_issue_resolve`. See "
             "`references/issues.md`.\n"
-        )
-        conventions = (
-            "### Convention maintenance\n"
-            "- `conventions/contributor.md` is an immutable role directive. "
-            "Your maintained conventions live in "
-            "`conventions/<vault>-conventions.md`, created per vault/domain "
-            "from `templates/vault-conventions.md` and registered below. See "
-            "`conventions/contributor.md` for the process.\n"
-        )
-        manifest_extra = "- `conventions/contributor.md` — role directive (immutable)\n"
-        add_line = "<!-- add: - `conventions/<vault>-conventions.md` — description (domain) -->\n"
+        ),
+        "manager": (
+            "### Issues\n"
+            "- Triage the ledger and run the sweep: "
+            "`obsidian_issue_list`, `obsidian_issue_resolve`, "
+            "`obsidian_maintain`. See `references/issues.md`, "
+            "`references/maintenance.md`.\n"
+        ),
+        "combined": (
+            "### Issues\n"
+            "- Raise like a contributor, triage like the manager: "
+            "`obsidian_issue`, `obsidian_issue_list`, "
+            "`obsidian_issue_resolve`, `obsidian_maintain`. See "
+            "`references/issues.md`, `references/maintenance.md`.\n"
+            "- Dual role: sweep findings about your own domains are "
+            "yours to fix; about other domains, raise them.\n"
+        ),
+    }
+    conventions = (
+        "### Convention maintenance\n"
+        "- Maintained conventions live in "
+        "`conventions/<vault>-conventions.md`; create/edit when a user "
+        "preference about writing rules lands; register below.\n"
+    )
+    manifest = (
+        "### Convention manifest\n"
+        "<!-- maintained by the growth protocol; one line per convention "
+        "file -->\n"
+        "<!-- add: - `conventions/<vault>-conventions.md` — description "
+        "(domain) -->\n"
+    )
 
+    if role == "manager":
+        return (
+            f"{SOUL_ANCHOR}\n"
+            "## Vault\n"
+            "- Operating this vault — tools, issues, and maintenance. "
+            "Each subsection points at what governs it.\n"
+            "### Vault operations\n"
+            f"{ops[role]}"
+            f"{issues[role]}"
+        )
     return (
         f"{SOUL_ANCHOR}\n"
         "## Vault\n"
         "- Operating this vault — tools, conventions, issues, and "
         "maintenance. Each subsection points at what governs it.\n"
         "### Vault operations\n"
-        "- For any task touching an Obsidian vault, load the `obsidian-vault` "
-        "skill first — it routes to the right tools and conventions.\n"
-        f"{issues}"
+        f"{ops[role]}"
+        f"{issues[role]}"
         f"{conventions}"
-        "### Convention manifest\n"
-        "<!-- maintained by the growth protocol; one line per convention file -->\n"
-        f"{manifest_extra}"
-        f"{add_line}"
+        f"{manifest}"
     )
 
 # --- composition (pure) ---------------------------------------------------
@@ -221,30 +224,39 @@ def profile_home(hermes_home: Path, name: str) -> Path:
     return hermes_home if name == "default" else hermes_home / "profiles" / name
 
 
-#: Role → convention fragments. contributor.md and manager.md are immutable
-#: role directives (06-growth-design §2.1, corrected 2026-08-04): a manager
-#: is NOT a contributor — its grants (meta/config/read, no content write) and
-#: duties need none of the authoring discipline — so a manager profile holds
-#: manager.md ONLY. combined (one-profile setup) holds both. The maintained,
+#: Role → skill bundles (2026-08-05 skill split). The role owns which skills
+#: a profile holds: a contributor gets the authoring skill, a manager gets the
+#: management skill, a one-profile setup (combined) gets both. The maintained,
 #: growing per-vault file is `<vault>-conventions.md`, created from the
-#: template by the growth protocol — never seeded here.
-ROLE_FRAGMENTS = {
-    "contributor": ["contributor.md"],
-    "manager": ["manager.md"],
-    "combined": ["contributor.md", "manager.md"],
+#: template by the growth protocol into the contributor skill's conventions/
+#: — never seeded here.
+ROLE_SKILLS = {
+    "contributor": ["obsidian-vault"],
+    "manager": ["obsidian-vault-management"],
+    "combined": ["obsidian-vault", "obsidian-vault-management"],
+}
+SKILL_BUNDLES = {
+    "obsidian-vault": BUNDLED_SKILL,
+    "obsidian-vault-management": MANAGER_SKILL,
 }
 
 
-def install_skill(profile_skills: Path, role: str) -> Path:
-    """Overlay the bundled skill into a profile's skills area (P5a).
+def install_skills(profile_skills: Path, role: str) -> list[Path]:
+    """Overlay the role's skill bundle(s) into a profile's skills area.
 
-    `SKILL.md`, `references/` and `templates/` become symlinks to the
-    bundle — the immutable base, update-propagating, never rewritten.
-    `conventions/` is a real per-profile dir holding the immutable role
-    directives for `role` (contributor | manager | combined), seeded
-    copy-if-missing. Stale directives from a former role are removed
-    (role alignment). The maintained per-vault file
-    `<vault>-conventions.md` is created by the growth protocol, never here.
+    A contributor gets `note-taking/obsidian-vault`, a manager gets
+    `note-taking/obsidian-vault-management`, a one-profile setup gets both
+    (2026-08-05 skill split). `SKILL.md`, `references/` and `templates/`
+    become symlinks to each bundle — the immutable base, update-
+    propagating, never rewritten. The contributor skill carries a real
+    `conventions/` dir: the maintained per-vault file
+    (`<vault>-conventions.md`) is created there by the growth protocol,
+    never here.
+
+    Role alignment is symmetric at the skill level: a skill the role no
+    longer holds loses its bundle-derived surface (the symlinks). Real
+    content — `conventions/` and copy-on-write customisations — is
+    preserved (the survival guarantee).
 
     A profile that deliberately edited a reference or template (broke the
     symlink into a real dir, copy-on-write — 06-growth-design §2.3) is
@@ -252,31 +264,31 @@ def install_skill(profile_skills: Path, role: str) -> Path:
     are replaced by symlinks. `SKILL.md` is engine-owned: any real file
     there is a stale composed variant and is always replaced.
     """
-    if role not in ROLE_FRAGMENTS:
+    if role not in ROLE_SKILLS:
         raise ValueError(f"unknown role: {role!r} (contributor|manager|combined)")
-    target = profile_skills / "obsidian-vault"
-    target.mkdir(parents=True, exist_ok=True)
+    wanted = ROLE_SKILLS[role]
+    targets: list[Path] = []
+    for name in wanted:
+        bundle = SKILL_BUNDLES[name]
+        target = profile_skills / "note-taking" / name
+        target.mkdir(parents=True, exist_ok=True)
+        _ensure_symlink(target / "SKILL.md", bundle / "SKILL.md")
+        for sub in ("references", "templates"):
+            _ensure_symlink(target / sub, bundle / sub)
+        if name == "obsidian-vault":
+            (target / "conventions").mkdir(exist_ok=True)
+        targets.append(target)
 
-    _ensure_symlink(target / "SKILL.md", BUNDLED_SKILL / "SKILL.md")
-    for sub in ("references", "templates"):
-        _ensure_symlink(target / sub, BUNDLED_SKILL / sub)
-
-    conv = target / "conventions"
-    conv.mkdir(exist_ok=True)
-    want = set(ROLE_FRAGMENTS[role])
-    for frag in ("contributor.md", "manager.md"):
-        dst = conv / frag
-        src = BUNDLED_SKILL / "conventions" / frag
-        if frag in want:
-            # Role directives are IMMUTABLE (2026-08-04): refresh from the
-            # bundle on every run. The maintained, growing file is
-            # <vault>-conventions.md, created by the growth protocol from the
-            # template — never touched here.
-            if src.is_file():
-                shutil.copy(src, dst)
-        elif dst.exists():
-            dst.unlink()  # role alignment — stale directive from a former role
-    return target
+    skills_root = profile_skills / "note-taking"
+    if skills_root.is_dir():
+        for existing in sorted(skills_root.glob("obsidian-vault*")):
+            if existing.name in wanted:
+                continue
+            for sub in ("SKILL.md", "references", "templates"):
+                link = existing / sub
+                if link.is_symlink():
+                    link.unlink()
+    return targets
 
 
 def ensure_soul_sections(soul_path: Path, role: str) -> bool:
@@ -879,7 +891,7 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
                                  if r in ROLE_META) or "Vault profile"
                 _create_profile(prof, desc)
             pskills = profile_home(hermes_home, prof) / "skills"
-            install_skill(pskills, role=skill_role)
+            install_skills(pskills, role=skill_role)
             soul = profile_home(hermes_home, prof) / "SOUL.md"
             ensure_soul_sections(soul, skill_role)
             seed_profile_config(hermes_home, prof)
@@ -931,11 +943,11 @@ def _create_profile(name: str, description: str) -> None:
 def vault_conventions_name(vault_root: Path) -> str:
     """Name of the maintained conventions file: ``<vault>-conventions.md``.
 
-    One per profile per vault (06-growth-design §2.1, 2026-08-04): the
-    immutable role directives (contributor.md / manager.md) ship with the
-    bundle; THIS file is the one that grows through interaction. Subdomains
-    share it unless their rulesets genuinely diverge — the split is a
-    documented LLM step, not a mechanical branch.
+    One per profile per vault (06-growth-design §2.1): the one file in the
+    contributor skill's conventions/ that grows through interaction — never
+    seeded, never touched by the installer. Subdomains share it unless their
+    rulesets genuinely diverge — the split is a documented LLM step, not a
+    mechanical branch.
     """
     return f"{vault_root.name}-conventions.md"
 
@@ -948,7 +960,7 @@ def ensure_conventions_file(profile_skills: Path, vault_root: Path,
     with the vault name substituted. Never overwrites an existing file (it
     grows through interaction — the installer's survival guarantee).
     """
-    conv_dir = profile_skills / "obsidian-vault" / "conventions"
+    conv_dir = profile_skills / "note-taking" / "obsidian-vault" / "conventions"
     dst = conv_dir / vault_conventions_name(vault_root)
     if dst.exists():
         return dst
@@ -1090,7 +1102,7 @@ def add_contributor(hermes_home: Path, name: str, vault_root: Path,
     contrib_skills = profile_home(hermes_home, name) / "skills"
     if not profile_home(hermes_home, name).is_dir():
         _create_profile(name, "Vault contributor")
-    install_skill(contrib_skills, role="contributor")
+    install_skills(contrib_skills, role="contributor")
     soul = profile_home(hermes_home, name) / "SOUL.md"
     ensure_soul_sections(soul, "contributor")
     seed_profile_config(hermes_home, name)
