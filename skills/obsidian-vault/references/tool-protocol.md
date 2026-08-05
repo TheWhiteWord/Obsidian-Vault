@@ -72,3 +72,18 @@ its own identity in `roles.yaml`.
 owning the vault's writing conventions (default: `obsidian-vault`; per-vault
 override via `conventions: {skill: ...}` in root config). It never returns the
 content; the agent loads that skill itself.
+
+When the caller's identity is known (agent + roles), the pointer also carries
+`directives` — the role-directive files that apply to *this* profile, derived
+from its grants:
+
+- `conventions/contributor.md` — the agent authors and maintains content
+  (holds `write` over a non-machinery path; `append` record-raising does
+  not qualify).
+- `conventions/manager.md` — the agent holds `meta`/`config` at the vault
+  root (scope is the discriminator: a contributor's `config` is scoped to its
+  own tree and never matches the root).
+
+One, the other, or both — a one-profile setup acting as manager and
+contributor gets both. An unlisted agent (deny-by-default) gets the bare
+pointer with no `directives`.
