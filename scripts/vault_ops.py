@@ -43,6 +43,135 @@ if str(PLUGIN_DIR) not in sys.path:
 #: upgraded in place on first contact.
 SOUL_ANCHOR = "<!-- vault-soul: managed by the installer; do not edit -->"
 
+#: Engine-synced copy of the Hermes default SOUL seed
+#: (hermes_cli/default_soul.py ``DEFAULT_SOUL_MD``). A profile SOUL whose
+#: content equals this — or one of the legacy comment scaffolds below —
+#: carries zero user intent, provably safe to replace with a full role
+#: SOUL (P8.1). The plugin cannot import ``hermes_cli``; keep this text
+#: in sync with the engine.
+DEFAULT_SOUL_MD = (
+    "You are Hermes Agent, an intelligent AI assistant created by Nous "
+    "Research. You are helpful, knowledgeable, and direct. You assist users "
+    "with a wide range of tasks including answering questions, writing and "
+    "editing code, analyzing information, creative work, and executing "
+    "actions via your tools. You communicate clearly, admit uncertainty "
+    "when appropriate, and prioritize being genuinely useful over being "
+    "verbose unless otherwise directed below. Be targeted and efficient in "
+    "your exploration and investigations."
+)
+
+#: Engine-synced legacy comment-only scaffolds (hermes_cli/default_soul.py
+#: ``_LEGACY_TEMPLATE_SOULS``) seeded by old installers; also zero user
+#: intent. Comparison is normalized, exactly like Hermes.
+_LEGACY_TEMPLATE_SOULS = (
+    (
+        "# Hermes Agent Persona\n"
+        "\n"
+        "<!--\n"
+        "This file defines the agent's personality and tone.\n"
+        "The agent will embody whatever you write here.\n"
+        "Edit this to customize how Hermes communicates with you.\n"
+        "\n"
+        "Examples:\n"
+        '  - "You are a warm, playful assistant who uses kaomoji occasionally."\n'
+        '  - "You are a concise technical expert. No fluff, just facts."\n'
+        '  - "You speak like a friendly coworker who happens to know everything."\n'
+        "\n"
+        "This file is loaded fresh each message -- no restart needed.\n"
+        "Delete the contents (or this file) to use the default personality.\n"
+        "-->"
+    ),
+    (
+        "# Hermes Agent Persona\n"
+        "\n"
+        "<!--\n"
+        "This file defines the agent's personality and tone.\n"
+        "The agent will embody whatever you write here.\n"
+        "Edit this to customize how Hermes communicates with you.\n"
+        "\n"
+        "This file is loaded fresh each message -- no restart needed.\n"
+        "Delete the contents (or this file) to use the default personality.\n"
+        "-->"
+    ),
+)
+
+
+def _normalize_soul(text: str) -> str:
+    """Normalize SOUL content for template comparison (mirrors Hermes)."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff").strip()
+
+
+def _is_pristine_soul(text: str) -> bool:
+    """True when SOUL content matches a known Hermes-shipped template.
+
+    The same guarantee ``is_legacy_template_soul`` relies on: a file
+    matching a shipped template carries zero user intent, so replacing it
+    wholesale cannot destroy user work.
+    """
+    normalized = _normalize_soul(text)
+    return normalized == _normalize_soul(DEFAULT_SOUL_MD) or any(
+        normalized == _normalize_soul(t) for t in _LEGACY_TEMPLATE_SOULS)
+
+
+#: Identity template keys (P8.1) — file names under ``souls/``. ``manager``
+#: is the one identity directly connected to the vault (its role IS the
+#: vault's health); the contributor identities are decoupled personas
+#: (2026-08-06 review). Lives at repo root, NOT under a preset: the
+#: manager template is used by BOTH presets, and these are profile
+#: templates, not vault content (examples/ = vault presets only).
+SOUL_IDENTITIES = ("manager", "system-owner", "creative", "researcher", "dev")
+#: Contributor identities — valid for a ``contributor``-role full soul.
+#: ``manager`` is its own role and its own identity.
+SOUL_CONTRIBUTOR_IDENTITIES = ("system-owner", "creative", "researcher", "dev")
+SOULS_DIR = PLUGIN_DIR / "souls"
+
+
+def _soul_template(identity: str) -> str:
+    """The identity prose for a template key (empty when unknown/missing).
+
+    Templates hold prose only — `# Identity` + `# Style` — never the
+    vault block; the engine composes prose + block so the block cannot
+    drift from ``_soul_block``.
+    """
+    template = SOULS_DIR / f"{identity}.md"
+    if not template.is_file():
+        return ""
+    return template.read_text(encoding="utf-8").rstrip()
+
+
+def _full_soul(identity: str, block: str) -> str | None:
+    """Composed full role SOUL: template prose + the managed block.
+
+    None when the identity has no shipped template (caller falls back to
+    block-only).
+    """
+    prose = _soul_template(identity)
+    if not prose:
+        return None
+    return prose + "\n\n" + block
+
+
+def _soul_identity(roles: set[str]) -> str:
+    """Identity template key for a vault-role set (setup path).
+
+    A single role with a shipped identity template → its key; everything
+    else (combined, system-only, blank contributor, multi-role) → ""
+    (block-only). ``system`` is never mapped here: the standard preset's
+    system owner is ``default`` (S-3 carve-out) and a dedicated
+    ``--system`` bind passes its identity explicitly in ``role_bind``.
+    The manager maps to ``manager`` (P8.1 review: the manager has a full
+    soul too, applied only when a NEW profile is created for the role).
+    """
+    if roles == {"manager"}:
+        return "manager"
+    if roles == {"creative"}:
+        return "creative"
+    if roles == {"dev"}:
+        return "dev"
+    if roles == {"researcher"}:
+        return "researcher"
+    return ""
+
 
 def _soul_block(role: str) -> str:
     """The SOUL sections for a role: contributor | manager | combined.
@@ -127,6 +256,66 @@ def _soul_block(role: str) -> str:
         f"{issues[role]}"
         f"{conventions}"
     )
+
+def _apply_soul_prose(soul_path: Path, prose_file: str, role: str) -> bool:
+    """Replace a profile SOUL's identity prose with the given file's
+    content (manager-drafted, user-confirmed — S-7/note c), preserving
+    the managed vault block and anything after it.
+
+    The file holds the full identity prose (`# Identity` + `# Style`),
+    same shape as the shipped templates. When the SOUL has an anchored
+    block, everything before the anchor is replaced; when it is missing
+    or pristine (fresh bind), the prose is written ahead of the block.
+    Refuses on a customized, unmanaged SOUL (no anchor, non-pristine) —
+    never claims an identity the installer did not create.
+    """
+    prose = Path(prose_file).read_text(encoding="utf-8").rstrip()
+    if not prose:
+        raise ValueError(f"soul file empty: {prose_file}")
+    if not soul_path.is_file():
+        soul_path.parent.mkdir(parents=True, exist_ok=True)
+        soul_path.write_text(prose + "\n\n" + _soul_block(role), encoding="utf-8")
+        return True
+    text = soul_path.read_text(encoding="utf-8")
+    idx = text.find(SOUL_ANCHOR)
+    if idx == -1:
+        if _is_pristine_soul(text) or not text.strip():
+            soul_path.write_text(prose + "\n\n" + _soul_block(role),
+                                 encoding="utf-8")
+            return True
+        raise ValueError(
+            f"{soul_path} has no managed vault block and is customized — "
+            f"refusing to claim its identity (bind without --soul first)")
+    head = text[:idx].rstrip()
+    tail = text[idx:]
+    new_text = prose + "\n\n" + tail
+    if new_text == text:
+        return False
+    soul_path.write_text(new_text, encoding="utf-8")
+    return True
+
+
+def _soul_has_identity(soul_path: Path) -> bool:
+    """True when a profile SOUL carries identity prose ahead of the anchor
+    (a full role soul or a user-customised identity — anything beyond the
+    pristine Hermes seed).
+
+    Deliberately format-agnostic (2026-08-06 review): it checks content,
+    not a specific heading — a user who re-formats their identity prose
+    (renames `# Identity`, restructures headings) must not break the
+    check. A block-only SOUL (pristine seed + managed block) is False.
+    """
+    if not soul_path.is_file():
+        return False
+    text = soul_path.read_text(encoding="utf-8")
+    idx = text.find(SOUL_ANCHOR)
+    if idx == -1:
+        return False
+    prefix = text[:idx].strip()
+    if not prefix:
+        return False
+    return not _is_pristine_soul(prefix)
+
 
 # --- composition (pure) ---------------------------------------------------
 
@@ -250,18 +439,35 @@ def install_skills(profile_skills: Path, role: str) -> list[Path]:
     return targets
 
 
-def ensure_soul_sections(soul_path: Path, role: str) -> bool:
-    """Write/refresh the managed SOUL sections block for a profile's role.
+def ensure_soul_sections(soul_path: Path, role: str, *,
+                         profile_name: str = "", identity: str = "") -> bool:
+    """Write/refresh the managed SOUL sections for a profile's role.
 
     Role: contributor | manager | combined (one-profile setup). Returns
     True if the file changed. Idempotent: an anchored block is replaced in
     place; the pre-P5b single-paragraph directive is upgraded in place
     (removed and replaced by the block); otherwise the block is appended.
+
+    Full-SOUL path (P8.1): when ``identity`` names a shipped template and
+    the profile is a non-default contributor — or the manager role with
+    the ``manager`` identity (2026-08-06 review) — a pristine SOUL.md
+    (missing, exactly ``DEFAULT_SOUL_MD``, or a legacy template) is
+    replaced wholesale with the template prose + the managed block. A
+    ``default`` profile (S-3) or a role without an identity template
+    (combined, bare contributor — S-4) always takes the block-only path.
+    User content is never touched: an anchored block in a customized SOUL
+    is replaced in place, the rest preserved.
     """
     block = _soul_block(role)
+    full = None
+    if identity and profile_name != "default":
+        if role == "contributor" and identity in SOUL_CONTRIBUTOR_IDENTITIES:
+            full = _full_soul(identity, block)
+        elif role == "manager" and identity == "manager":
+            full = _full_soul(identity, block)
     if not soul_path.exists():
         soul_path.parent.mkdir(parents=True, exist_ok=True)
-        soul_path.write_text(block, encoding="utf-8")
+        soul_path.write_text(full or block, encoding="utf-8")
         return True
     text = soul_path.read_text(encoding="utf-8")
 
@@ -276,7 +482,13 @@ def ensure_soul_sections(soul_path: Path, role: str) -> bool:
         # Already managed — replace the anchored block in place.
         start = text.index(SOUL_ANCHOR)
         prefix = text[:start].rstrip()
-        new_text = (prefix + "\n\n" + block) if prefix else block
+        if full and (not prefix or _is_pristine_soul(prefix)):
+            # Prefix is empty (the file is entirely our block —
+            # engine-written on a missing soul) or a pristine Hermes
+            # seed: upgrade to the full role SOUL.
+            new_text = full
+        else:
+            new_text = (prefix + "\n\n" + block) if prefix else block
     elif old_directive in text:
         # Pre-P5b single paragraph — replace it with the full block.
         start = text.index(old_directive)
@@ -284,6 +496,10 @@ def ensure_soul_sections(soul_path: Path, role: str) -> bool:
         prefix = text[:start].rstrip()
         suffix = text[end:].lstrip()
         new_text = "\n\n".join(part for part in (prefix, block, suffix) if part)
+    elif full and _is_pristine_soul(text):
+        # Fresh Hermes seed / legacy template → full role SOUL replaces
+        # it wholesale (zero user intent, provably safe).
+        new_text = full
     else:
         new_text = text.rstrip() + "\n\n" + block
 
@@ -1208,6 +1424,10 @@ def remove_soul_sections(soul_path: Path) -> bool:
 
     The block starts at the vault-soul anchor comment and ends at the next
     level-1 heading (or EOF); a preceding blank separator is collapsed.
+    A full role SOUL (P8.1) whose remaining prose is exactly a shipped
+    template — engine-written, zero user intent — is restored to
+    ``DEFAULT_SOUL_MD`` (the pre-bind seed) instead of being left as a
+    stale identity after unbind. User content is always preserved.
     Returns True if anything was removed.
     """
     import re as _re
@@ -1231,10 +1451,21 @@ def remove_soul_sections(soul_path: Path) -> bool:
     head = text[:line_start]
     if head.endswith("\n\n"):
         head = head[:-1]
-    new_text = head + text[end:]
-    if new_text == text:
+    remainder = head + text[end:]
+    # P8.1: a full soul whose prose is exactly a shipped template is
+    # engine-written — restore the pre-bind seed rather than leave a
+    # stale identity (the same "a stale block lies" rule, applied to the
+    # identity layer).
+    normalized = _normalize_soul(remainder)
+    if normalized and normalized != _normalize_soul(DEFAULT_SOUL_MD):
+        for identity in SOUL_IDENTITIES:
+            prose = _soul_template(identity)
+            if prose and normalized == _normalize_soul(prose):
+                remainder = DEFAULT_SOUL_MD
+                break
+    if remainder == text:
         return False
-    soul_path.write_text(new_text, encoding="utf-8")
+    soul_path.write_text(remainder, encoding="utf-8")
     return True
 
 
@@ -1302,7 +1533,11 @@ def _surface_for_roles(hermes_home: Path, profile: str, roles: set[str],
     skill_role = _role_skill(roles)
     if not dry_run:
         install_skills(prof_home / "skills", role=skill_role)
-        ensure_soul_sections(prof_home / "SOUL.md", skill_role)
+        # Re-alignment carries no identity (generic grants): block-only
+        # refresh — an existing full-soul prose is preserved by the
+        # anchor-replace path.
+        ensure_soul_sections(prof_home / "SOUL.md", skill_role,
+                             profile_name=profile)
     print(f"profile {profile}: {skill_role} "
           f"({', '.join(sorted(roles))})")
 
@@ -1310,7 +1545,8 @@ def _surface_for_roles(hermes_home: Path, profile: str, roles: set[str],
 def role_bind(hermes_home: Path, vault_root: Path, profile: str,
               new: bool = False, manager_role: bool = False,
               domain: str = "", config_file: str = "",
-              system_tree: bool = False, dry_run: bool = False) -> None:
+              system_tree: bool = False, soul_file: str = "",
+              dry_run: bool = False) -> None:
     """Bind a profile to the vault (§4.5): ability surface + grants.
 
     Without ``--domain``/``--system``: profile-level bind (skill overlay +
@@ -1323,6 +1559,9 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
     tree ``system/`` + its config (stub or ``--config``) and grant
     write/config over ``system/**`` — the standard preset's ``default``
     block, made reachable as a growth action.
+    With ``--soul FILE``: write the file's identity prose as the profile
+    SOUL's identity (manager-drafted, user-confirmed — S-7/note c),
+    preserving the managed block. Supersedes the identity templates.
     Idempotent. Refuses: ``--manager`` with ``--domain`` or ``--system``;
     a domain/system bind on the manager profile (managers hold no content
     grants).
@@ -1338,6 +1577,7 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         raise FileNotFoundError(
             f"{roles_path} missing — scaffold the vault first")
     prof_home = profile_home(hermes_home, profile)
+    created = new and not prof_home.is_dir()
     if new:
         if not prof_home.is_dir():
             _create_profile(profile, "Vault manager" if manager_role
@@ -1404,9 +1644,32 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
     skill_role = _role_skill(roles)
     if not dry_run:
         install_skills(prof_home / "skills", role=skill_role)
-        ensure_soul_sections(prof_home / "SOUL.md", skill_role)
+        # P8.1: identity selection. `--soul FILE` supersedes the templates
+        # (manager-drafted, user-confirmed). Otherwise: a `--system` bind
+        # carries the system-owner identity; a `--manager --new` bind
+        # carries the manager identity (a NEW profile created for the
+        # manager role — existing manager profiles keep their own
+        # identity, block-only). Domain binds leave identity empty
+        # (generation is the `--soul FILE` step, S-6/S-7). `default`
+        # never gets a full soul (S-3 — enforced inside
+        # ensure_soul_sections).
+        if soul_file:
+            _apply_soul_prose(prof_home / "SOUL.md", soul_file, skill_role)
+            identity = ""
+        else:
+            identity = "system-owner" if (system_tree and created) else (
+                "manager" if (manager_role and created) else "")
+        ensure_soul_sections(prof_home / "SOUL.md", skill_role,
+                             profile_name=profile, identity=identity)
         seed_profile_config(hermes_home, profile)
         enable_plugin_for_profile(hermes_home, profile, vault_root)
+    # Note c (2026-08-06): adding a domain to a profile that already has a
+    # full role SOUL may stale its identity — the manager should review.
+    if domain and not dry_run and _soul_has_identity(
+            prof_home / "SOUL.md"):
+        print(f"note: {profile} has a full role SOUL; its identity may "
+              f"need review after adding domain '{domain}' — the manager "
+              f"drafts an update, user confirms, `bind --soul FILE` writes.")
     print(f"bound {profile}: {skill_role}"
           + (f" + domain work/{domain}/**" if domain else "")
           + (" + system tree (system/**)" if system_tree else ""))
