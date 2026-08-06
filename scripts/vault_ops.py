@@ -19,6 +19,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 PLUGIN_DIR = Path(os.environ.get(
     "OBSIDIAN_VAULT_PLUGIN",
@@ -402,6 +403,143 @@ def enable_plugin_for_profile(hermes_home: Path, name: str, vault_root: Path) ->
         print(f"[setup] WARNING: plugin enable failed for {name}: {detail}")
     if ensure_profile_env(prof_home / ".env", vault_root, name):
         print(f"[setup] profile env updated: {prof_home / '.env'}")
+
+
+# --- scheduled maintenance cron (2026-08-06) ------------------------------
+
+#: The standard maintenance jobs, installed at setup on the profile the
+#: manager role is bound to — role-dependent, never a hardcoded name
+#: (one-agent installs land on `default`; `existing:NAME` lands on NAME).
+#: Job NAME is the idempotency key: an existing job with the same name is
+#: left untouched, never clobbered. The hermes CLI is the interface (it owns
+#: the jobs.json store format; stores are per-profile by design). Jobs fire
+#: only while the gateway runs.
+class CronJobSpec(TypedDict):
+    name: str
+    schedule: str
+    skills: list[str]
+    prompt: str
+
+
+CRON_JOBS: list[CronJobSpec] = [
+    {
+        "name": "vault-maintain-daily",
+        "schedule": "0 5 * * *",
+        "skills": ["obsidian-vault-management"],
+        "prompt": (
+            "Run the vault management loop from the loaded "
+            "obsidian-vault-management skill (context, verify, triage, act), "
+            "with these specifics:\n"
+            "- Sweep: obsidian_maintain mode=maintain, distribute=true "
+            "(full correctness census).\n"
+            "- Verify also covers the README Tree drift check and the "
+            "grant-anchor check; raise [maintenance] issues as the skill "
+            "directs.\n"
+            "- Act within your remit only; escalate content judgments as "
+            "ledger issues.\n"
+            "Report in 3-5 lines: findings per check, issues "
+            "created/skipped/resolved/declined, anything needing a human. "
+            "If the sweep reports zero findings, say so in one line."
+        ),
+    },
+    {
+        "name": "vault-optimize-weekly",
+        "schedule": "0 6 * * 1",
+        "skills": ["obsidian-vault-management"],
+        "prompt": (
+            "Run the vault management loop from the loaded "
+            "obsidian-vault-management skill (context, verify, triage, act), "
+            "with these specifics:\n"
+            "- Sweep: obsidian_maintain mode=optimize, distribute=true "
+            "(correctness census PLUS quality suggestions: duplicates, "
+            "missed connections, tag normalisation, thin notes).\n"
+            "- Verify also covers the README Tree drift check and the "
+            "grant-anchor check; raise [maintenance] issues as the skill "
+            "directs.\n"
+            "- Suggestions are never auto-applied: route them to the "
+            "owning agent as ledger issues.\n"
+            "Report in 3-5 lines: findings, suggestions, issues "
+            "created/skipped/resolved/declined; flag anything needing a "
+            "human decision."
+        ),
+    },
+]
+
+
+def _cron_cmd(profile: str, *args: str) -> list[str]:
+    """The hermes CLI invocation scoped to a profile.
+
+    `default` is the HERMES_HOME root — the bare command (mirrors
+    enable_plugin_for_profile); named profiles get --profile.
+    """
+    if profile == "default":
+        return ["hermes", *args]
+    return ["hermes", "--profile", profile, *args]
+
+
+def _cron_job_exists(profile: str, name: str) -> bool:
+    """Whether a job with this name already exists on the profile.
+
+    Reads `hermes cron list` output (the CLI owns the store format). A
+    failed list is treated as "unknown" — the caller fails safe (skips
+    creation rather than risking a duplicate).
+    """
+    import re
+    import subprocess
+
+    try:
+        res = subprocess.run(_cron_cmd(profile, "cron", "list"),
+                             check=False, capture_output=True, text=True,
+                             timeout=120)
+    except FileNotFoundError:
+        return False
+    if res.returncode != 0:
+        return False
+    return bool(re.search(rf"(?m)^\s*Name:\s+{re.escape(name)}\s*$",
+                          res.stdout))
+
+
+def install_cron_jobs(profile: str, dry_run: bool = False) -> list[str]:
+    """Create the standard maintenance cron jobs on a profile, idempotently.
+
+    The profile is the one the manager role is bound to — role-dependent,
+    never hardcoded. Jobs are created through the hermes CLI so the gateway
+    owns the store format; a job whose name already exists is left untouched
+    (the user may have customised it). Returns recap lines.
+    """
+    import subprocess
+
+    out: list[str] = []
+    for spec in CRON_JOBS:
+        name = spec["name"]
+        if dry_run:
+            out.append(f"[dry-run] cron create {name} on {profile} "
+                       f"({spec['schedule']})")
+            continue
+        if _cron_job_exists(profile, name):
+            out.append(f"cron: {name} already exists on {profile} "
+                       "(left untouched)")
+            continue
+        cmd = _cron_cmd(profile, "cron", "create",
+                        spec["schedule"], spec["prompt"],
+                        "--name", name, "--deliver", "local")
+        for skill in spec["skills"]:
+            cmd += ["--skill", skill]
+        try:
+            res = subprocess.run(cmd, check=False, capture_output=True,
+                                 text=True, timeout=120)
+        except FileNotFoundError:
+            out.append(f"WARNING: cron create failed for {name} on "
+                       f"{profile}: hermes CLI not found")
+            continue
+        if res.returncode == 0:
+            out.append(f"cron: {name} created on {profile} "
+                       f"({spec['schedule']})")
+        else:
+            detail = (res.stderr or res.stdout).strip()
+            out.append(f"WARNING: cron create failed for {name} on "
+                       f"{profile}: {detail}")
+    return out
 
 
 # --- vault scaffolding (pure) ---------------------------------------------

@@ -28,8 +28,8 @@ from pathlib import Path
 from vault_ops import (_active_agent_names, _block_text, _create_profile,
                        _grant_role, _revoke_globs, _role_skill,
                        enable_plugin_for_profile, ensure_soul_sections,
-                       install_skills, profile_home, scaffold_vault,
-                       seed_profile_config)
+                       install_cron_jobs, install_skills, profile_home,
+                       scaffold_vault, seed_profile_config)
 
 # --- setup stage machine (P6 redesign, 2026-08-05) -------------------------
 
@@ -267,6 +267,13 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
             if pairs and _revoke_globs(roles_path, name, pairs,
                                        dry_run=dry_run):
                 out.append(f"roles.yaml: {name} commented out (unassigned)")
+
+    # Scheduled maintenance cron on the manager profile — role-dependent:
+    # whatever profile the questionnaire bound the manager role to
+    # (one-agent installs land on `default`), never a hardcoded name.
+    for prof in sorted(p for p, roles in profiles.items()
+                       if "manager" in roles):
+        out.extend(install_cron_jobs(prof, dry_run=dry_run))
 
     if not dry_run:
         _save_setup_state(hermes_home, {"stage": 0, "answers": {}})
