@@ -791,6 +791,20 @@ Work that landed during P0–P2 but was not in the original trajectory:
 - ☑ **Plugin is enabled in Hermes** and its tools are registered through the
   real plugin loader + tool registry (verified end-to-end). Tools appear after
   a Hermes restart, since tools load at startup.
+- ☑ **Blank preset stops pre-claiming the system tree (2026-08-06).** The
+  blank preset shipped a standing `system/**` write grant for `default`
+  with NO tree — an invisible permission that silently made `default` the
+  derived owner of any user-created root `system/` in a "you bring your
+  own tree" vault. Fix: blank ships NO system grant (its "No `system/`,
+  no `work/`" claim is now true), and the reserved tree became a growth
+  action — `--role bind <NAME> --system` creates `system/` + config + the
+  write/config grant (the standard preset's `default` block as a verb,
+  mutually exclusive with `--domain` and `--manager`). The standard
+  preset and the live vault are UNCHANGED — `system/` stays real and
+  granted there; the flaw was blank-only. Consequence: the
+  standing-grant carve-out in the manager's grant-anchor check is
+  retired — a bind always creates the tree, so a missing `system/**`
+  base is a rename symptom, flagged.
 
 ---
 
