@@ -616,6 +616,10 @@ def test_scaffold_blank_creates_only_config(tmp_path):
     agents = yaml.safe_load((root / ".vault" / "roles.yaml").read_text())["agents"]
     assert set(agents) == {"default"}
     assert "vault-manager" not in agents
+    # No standing system grant (2026-08-06): a blank preset pre-claims no
+    # tree — `default` cannot create in system/** until a --system bind.
+    from vault.grants import load_roles
+    assert not load_roles(root).allows("default", "create", "system/x.md")
     # D1 (2026-08-05): no conventions pointer in configs — the writing
     # rules live in the loaded skill, not in the vault config.
     cfg = (root / ".vault" / "config.yaml").read_text(encoding="utf-8")
@@ -719,11 +723,12 @@ def test_starter_roles_globs_reach_domain_paths(tmp_path):
     root = tmp_path / "vault"
     installer.scaffold_vault(root, "standard")
 
-    # default: owns system, reads all. No issues-channel grants — the issue
-    # layer is a ledger (records, not notes); raising requires no grant
-    # beyond registration (spec 05 v4).
+    # default: owns the system tree, reads all. No issues-channel grants —
+    # the issue layer is a ledger (records, not notes); raising requires no
+    # grant beyond registration (spec 05 v4).
     agents = _starter_roles_agents(root)
-    assert path_matches(agents["default"]["write"][0], "system/handbook/x.md")
+    assert path_matches(agents["default"]["write"][0],
+                        "system/handbook/x.md")
     assert path_matches(agents["default"]["read"][0], "work/creative/projects/y.md")
     assert "append" not in agents["default"]
 

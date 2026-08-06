@@ -356,6 +356,76 @@ def test_bind_domain_full_flow(tmp_path):
                                     "work/recipes/note.md")
 
 
+def test_bind_system_tree_full_flow(tmp_path):
+    """--system: creates the reserved tree + config and grants write/config
+    over system/** — the standard preset's default block as a growth
+    action (2026-08-06: blank no longer ships a standing system grant)."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "default")
+
+    installer.role_bind(hermes, vault, "default", system_tree=True)
+
+    cfg = vault / "system" / ".vault" / "config.yaml"
+    assert cfg.is_file()
+    assert "system" in cfg.read_text(encoding="utf-8")
+
+    registry = load_roles(vault)
+    assert registry.allows("default", "create", "system/handbook/x.md")
+    assert registry.allows("default", "edit_config",
+                           "system/.vault/config.yaml")
+    assert not registry.allows("default", "edit", ".vault/roles.yaml")
+
+
+def test_bind_system_tree_uses_config_file(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "default")
+    cfg_file = tmp_path / "system-config.yaml"
+    cfg_file.write_text("fields:\n  kind:\n    allowed: [spec, log]\n",
+                        encoding="utf-8")
+
+    installer.role_bind(hermes, vault, "default", system_tree=True,
+                        config_file=str(cfg_file))
+
+    raw = (vault / "system" / ".vault" / "config.yaml").read_text(
+        encoding="utf-8")
+    assert "allowed: [spec, log]" in raw
+
+
+def test_bind_system_tree_idempotent(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "default")
+    installer.role_bind(hermes, vault, "default", system_tree=True)
+    before = (vault / ".vault" / "roles.yaml").read_text(encoding="utf-8")
+    installer.role_bind(hermes, vault, "default", system_tree=True)
+    assert (vault / ".vault" / "roles.yaml").read_text(
+        encoding="utf-8") == before
+
+
+def test_bind_system_tree_refuses_duplicate_owner(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "bob")
+    installer.role_bind(hermes, vault, "bob", system_tree=True)
+    _bound_contributor(hermes, vault, "default")
+    with pytest.raises(ValueError, match="single owner"):
+        installer.role_bind(hermes, vault, "default", system_tree=True)
+
+
+def test_bind_system_tree_refuses_manager(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _profile_dir(hermes, "vault-manager")
+    installer.role_bind(hermes, vault, "vault-manager", manager_role=True)
+    with pytest.raises(ValueError, match="no content grants"):
+        installer.role_bind(hermes, vault, "vault-manager", system_tree=True)
+
+
+def test_bind_system_tree_refuses_with_domain(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "bob")
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        installer.role_bind(hermes, vault, "bob", system_tree=True,
+                            domain="recipes")
+
+
 def test_bind_domain_on_existing_tree_grants_only(tmp_path):
     """bind --domain on an already-scaffolded tree = grant only (P7)."""
     hermes, vault = _scratch(tmp_path)
