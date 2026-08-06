@@ -247,8 +247,13 @@ What remains for later (recorded, never designed from zero):
   without new tooling.
 
 Cron cadence: **daily `maintain`** (delta always first), **weekly
-`optimize`** — confirmed with Davide. The vault-manager profile invokes it on
-schedule; its skill (`obsidian-vault-management`) holds judgment + escalation rules.
+`optimize`** — confirmed with Davide. Installed by the setup questionnaire on
+whichever profile the manager role is bound to (role-dependent — one-agent
+installs land on `default`), via the hermes cron store; the manager skill
+(`obsidian-vault-management`) is pinned on the jobs and holds judgment +
+escalation rules. User-requested *content* cron ("every day, note X") is a
+manager-skill procedure (`references/recurring-tasks.md`), not engine
+machinery — the plugin never learns about specific workflows.
 
 ---
 

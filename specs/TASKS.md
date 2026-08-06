@@ -476,8 +476,10 @@ Design: `05-maintenance-design.md` (v4 — the **issue ledger**).
   `distribute`, `dry_run`)
 - ☑ Cron schedule: daily `maintain` (05:00), weekly `optimize` (Mon 06:00) —
   installed on the `vault-manager` profile (`hermes --profile vault-manager
-  cron`). NOTE: the gateway is not running as a daemon, so jobs fire only
-  when it is up (`hermes gateway install`).
+  cron`). **SUPERSEDED 2026-08-06** — setup now installs them
+  role-dependently (see the Scheduled maintenance cron phase below). NOTE:
+  the gateway is not running as a daemon, so jobs fire only when it is up
+  (`hermes gateway install`).
 - ☐ DEFERRED — human-visible issue board (derived note, regenerated each
   sweep): purely for the human, not agents. Design + build when the ledger is
   stable.
@@ -710,6 +712,33 @@ LLM-improvised. **Complete 2026-08-05.** 287-test suite (286 + P5d).*
   entrypoint's registered tools (drift guard)
 - ☑ README rewritten for the install/setup split (stale TWW-era copy
   replaced; one-line install prompt for the agent)
+
+### Scheduled maintenance cron — setup-embedded (2026-08-06) ☑
+*Proves: the maintenance schedule ships with the vault.* The two jobs were
+hand-created in dev (P4); a fresh install got zero. Setup now installs them
+at finalize.
+
+**Design decision (Davide, 2026-08-06):** maintenance cron is installer-owned;
+user-requested *content* cron is decoupled from the plugin — a manager-skill
+procedure (`references/recurring-tasks.md`), not engine machinery.
+
+- ☑ `install_cron_jobs(profile)` in `vault_ops.py` — shells `hermes cron
+  create` per job; idempotent by job NAME (existing jobs left untouched);
+  `--dry-run` shells nothing.
+- ☑ Setup finalize derives the target profile from the manager ROLE
+  (role-dependent — one-agent installs land on `default`; `existing:NAME`
+  lands on NAME); never a hardcoded name.
+- ☑ Jobs pin the manager skill (`obsidian-vault-management`) and carry the
+  full management loop (sweep + README drift + grant-anchor + triage), not
+  a bare tool call.
+- ☑ Manager skill: `references/recurring-tasks.md` (profile-by-grants,
+  chained jobs via `context_from` for cross-owner workflows, first-run
+  verification).
+- ☑ Tests: 5 unit tests (command shape, bare-vs-profile, idempotency,
+  dry-run, failure warning) + E2E probe asserts jobs land on the manager
+  profile in standard/blank AND on `default` in one-agent installs.
+- ☑ Live vault: stale dev-time jobs recreated with the new prompts
+  (2026-08-06, ids rotated; verified via `cron list` + jobs.json).
 
 ### P6 — Coder-plugin interaction ☐
 *Deferred (2026-08-04): a specific feature needing its own research and
