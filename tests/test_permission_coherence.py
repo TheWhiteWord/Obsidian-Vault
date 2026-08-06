@@ -55,7 +55,11 @@ def roles(vault_with_roles):
 
 
 class TestIssuesChannelRestricted:
-    """D6 #3 — `allowed` unioned with root; the channel must restrict."""
+    """D6 #3 — `allowed` unioned with root; the channel must restrict.
+
+    P7 (spec 07 §2.3): the channel is inside SYSTEM (owned by `system`), so
+    the cross-tree writer (tww) is shadowed — the owner writes it.
+    """
 
     def test_issues_vocabulary_is_allowed_only(self, vault_with_issue_config):
         for tree in ("SYSTEM", "CREATIVE"):
@@ -66,7 +70,7 @@ class TestIssuesChannelRestricted:
             assert cfg.fields["kind"]["restricted"] is True
 
     def test_conforming_issue_is_accepted(self, vault_with_issue_config, roles):
-        out = write_note(vault_with_issue_config, "tww", roles,
+        out = write_note(vault_with_issue_config, "system", roles,
                          "SYSTEM/ISSUES/real-problem.md",
                          {"type": "note", "kind": ["issue"], "status": "open",
                           "tags": ["bug"], "created": "2026-08-03"})
@@ -74,14 +78,14 @@ class TestIssuesChannelRestricted:
 
     def test_non_issue_kind_is_refused(self, vault_with_issue_config, roles):
         with pytest.raises(WriteRefused, match="does not conform"):
-            write_note(vault_with_issue_config, "tww", roles,
+            write_note(vault_with_issue_config, "system", roles,
                        "SYSTEM/ISSUES/not-an-issue.md",
                        {"type": "note", "kind": ["spec"], "status": "open",
                         "tags": ["x"], "created": "2026-08-03"})
 
     def test_non_issue_status_is_refused(self, vault_with_issue_config, roles):
         with pytest.raises(WriteRefused, match="does not conform"):
-            write_note(vault_with_issue_config, "tww", roles,
+            write_note(vault_with_issue_config, "system", roles,
                        "SYSTEM/ISSUES/bad-status.md",
                        {"type": "note", "kind": ["issue"], "status": "draft",
                         "tags": ["x"], "created": "2026-08-03"})

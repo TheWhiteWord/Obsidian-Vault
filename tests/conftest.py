@@ -119,6 +119,7 @@ agents:
 
   tww:
     write:  ["CREATIVE/**"]
+    config: ["CREATIVE/**"]   # D-5/P7: the domain owner evolves its own config
     read:   ["CREATIVE/**", "*/KNOWLEDGE/**"]
     append: ["*/ISSUES/**"]
 

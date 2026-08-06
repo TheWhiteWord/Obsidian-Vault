@@ -42,6 +42,7 @@ EXPECTED_TOOLS = {
     "obsidian_delete",
     "obsidian_scaffold",
     "obsidian_edit_config",
+    "obsidian_conventions",
     "obsidian_index",
     "obsidian_audit",
     "obsidian_reference",

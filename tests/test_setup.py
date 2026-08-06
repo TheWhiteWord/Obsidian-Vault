@@ -385,27 +385,30 @@ def test_create_profile_silent_on_success(tmp_path, monkeypatch, capsys):
 
 # --- ensure_soul_sections (P5b: role-aware, anchored) -----------------------
 
-def test_soul_sections_contributor_has_four_lean_sections(tmp_path):
+def test_soul_sections_contributor_has_lean_sections(tmp_path):
     soul = tmp_path / "SOUL.md"
     assert installer.ensure_soul_sections(soul, "contributor") is True
     text = soul.read_text(encoding="utf-8")
     assert installer.SOUL_ANCHOR in text
-    # One `## Vault` umbrella with `###` subsections (2026-08-04).
+    # One `## Vault` umbrella with `###` subsections (2026-08-04); the
+    # Convention manifest is retired (P7 — conventions are in-tree).
     assert "## Vault\n" in text
     for section in ("### Vault operations", "### Issues",
-                    "### Convention maintenance", "### Convention manifest"):
+                    "### Convention maintenance"):
         assert section in text
+    assert "### Convention manifest" not in text
     # Lean pointers: tools/references, not prose instruction.
     assert "obsidian_issue" in text
     assert "references/issues.md" in text
     # Contributor must NOT see the sweep as its job.
     assert "obsidian_maintain" not in text
-    # Manifest starts empty-but-directed; no role directives exist anymore.
+    # No role-directive files exist anymore; the manifest machinery
+    # (and its directed add-marker) is retired (P7).
     assert "conventions/contributor.md" not in text
     assert "conventions/manager.md" not in text
-    assert "<!-- add:" in text
-    # Maintained conventions point at the per-vault file.
-    assert "<vault>-conventions.md" in text
+    assert "<!-- add:" not in text
+    # Maintained conventions point at the in-tree file (P7).
+    assert ".vault/conventions.md" in text
 
 
 def test_soul_sections_manager_sees_sweep_only(tmp_path):
@@ -430,9 +433,10 @@ def test_soul_sections_combined_dedicated_text(tmp_path):
     assert "references/issues.md" in text
     # Dedicated combined text: the dual role stated once, conventions kept.
     assert "Dual role" in text
-    assert "<vault>-conventions.md" in text
+    assert "obsidian_conventions" in text   # in-tree pointer (P7)
+    assert "conventions/<vault>" not in text
     assert "conventions/manager.md" not in text
-    assert "### Convention manifest" in text
+    assert "### Convention manifest" not in text   # retired (P7)
 
 
 def test_soul_sections_anchor_replace_is_idempotent(tmp_path):
@@ -625,6 +629,14 @@ def test_starter_roles_globs_reach_domain_paths(tmp_path):
     assert roles.allows("creative", "read", "work/coding/knowledge/rust.md")
     assert roles.allows("creative", "create", "work/creative/projects/idea.md")
     assert not roles.allows("creative", "create", "work/coding/projects/x.md")
-    assert roles.allows("researcher", "create", "work/creative/knowledge/kant.md")
+    # P7 shadowing (spec 07 §2.2): the wildcard write glob is capability-only
+    # — inside creative's owned scope it grants nothing. The P7.6 preset
+    # restructure makes the researcher the literal owner of knowledge/
+    # (enumerated globs), restoring its write there while the domain
+    # owners' write is shadowed to it.
+    assert roles.allows("researcher", "create",
+                        "work/creative/knowledge/kant.md")
+    assert not roles.allows("creative", "create",
+                            "work/creative/knowledge/kant.md")
     assert roles.allows("researcher", "read", "system/handbook/design.md")
     assert not roles.allows("researcher", "create", "work/creative/projects/idea.md")

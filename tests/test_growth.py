@@ -37,71 +37,36 @@ def _profile_dir(hermes: Path, name: str) -> Path:
     return home
 
 
-# --- vault_conventions_name / ensure_conventions_file ----------------------
+# --- ensure_root_conventions (P7 §4.2) -------------------------------------
 
-def test_vault_conventions_name_uses_vault_dir_name():
-    assert installer.vault_conventions_name(Path("/x/TWW")) == "TWW-conventions.md"
-
-
-def test_ensure_conventions_file_creates_from_template_and_survives(tmp_path):
-    hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    first = installer.ensure_conventions_file(profile / "skills", vault)
-    assert first.name == f"{vault.name}-conventions.md"
-    text = first.read_text(encoding="utf-8")
+def test_ensure_root_conventions_seeds_from_template_and_survives(tmp_path):
+    hermes, vault = _scratch(tmp_path, with_vault=False)
+    conv = installer.ensure_root_conventions(vault)
+    assert conv == vault / ".vault" / "conventions.md"
+    text = conv.read_text(encoding="utf-8")
     assert vault.name in text          # <Vault name> substituted
     assert "## Rules" in text          # template body intact
 
     # Growth through interaction must survive a re-run.
-    first.write_text("# my grown conventions\n", encoding="utf-8")
-    again = installer.ensure_conventions_file(profile / "skills", vault)
-    assert again == first
+    conv.write_text("# my grown conventions\n", encoding="utf-8")
+    again = installer.ensure_root_conventions(vault)
+    assert again == conv
     assert again.read_text(encoding="utf-8") == "# my grown conventions\n"
 
 
-def test_ensure_conventions_file_dry_run_creates_nothing(tmp_path):
-    hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    installer.ensure_conventions_file(profile / "skills", vault, dry_run=True)
-    assert not (profile / "skills" / "note-taking" / "obsidian-vault" / "conventions").exists()
+def test_ensure_root_conventions_dry_run_creates_nothing(tmp_path):
+    hermes, vault = _scratch(tmp_path, with_vault=False)
+    installer.ensure_root_conventions(vault, dry_run=True)
+    assert not (vault / ".vault" / "conventions.md").exists()
 
 
-# --- append_manifest_entry -------------------------------------------------
-
-def test_append_manifest_entry_before_marker_and_idempotent(tmp_path):
-    hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "creative")
-    installer.ensure_soul_sections(profile / "SOUL.md", "contributor")
-    soul = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert "<!-- add:" in soul
-
-    line = (f"- `conventions/{vault.name}-conventions.md` — "
-            f"recipes domain conventions (work/recipes/**)")
-    assert installer.append_manifest_entry(profile / "SOUL.md", line) is True
-    text = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert line in text
-    assert text.index(line) < text.index("<!-- add:")   # above the marker
-    # The marker stays as the directed placeholder.
-    assert "<!-- add:" in text
-
-    assert installer.append_manifest_entry(profile / "SOUL.md", line) is False
-    assert (profile / "SOUL.md").read_text(encoding="utf-8") == text
-
-
-def test_append_manifest_entry_refuses_manager_soul(tmp_path):
-    hermes, vault = _scratch(tmp_path)
-    profile = _profile_dir(hermes, "vault-manager")
-    installer.ensure_soul_sections(profile / "SOUL.md", "manager")
-    line = (f"- `conventions/{vault.name}-conventions.md` — "
-            f"recipes domain conventions (work/recipes/**)")
-    with pytest.raises(ValueError, match="no convention-manifest add-marker"):
-        installer.append_manifest_entry(profile / "SOUL.md", line)
-
-
-def test_append_manifest_entry_requires_soul_file(tmp_path):
-    hermes, _vault = _scratch(tmp_path, with_vault=False)
-    with pytest.raises(FileNotFoundError, match="SOUL not found"):
-        installer.append_manifest_entry(hermes / "nope" / "SOUL.md", "- x")
+def test_scaffold_seeds_root_conventions(tmp_path):
+    """Both presets get the seeded root conventions file (P7 §4.2)."""
+    root = tmp_path / "vault"
+    installer.scaffold_vault(root, "blank")
+    assert (root / ".vault" / "conventions.md").is_file()
+    text = (root / ".vault" / "conventions.md").read_text(encoding="utf-8")
+    assert root.name in text           # <Vault name> substituted
 
 
 # --- _append_agent_grant ---------------------------------------------------
@@ -113,6 +78,7 @@ def test_append_agent_grant_adds_block_and_parses(tmp_path):
     text = roles.read_text(encoding="utf-8")
     assert 'write: ["work/recipes/**"]' in text
     assert 'config: ["work/recipes/**"]' in text
+    assert 'meta: ["work/recipes/**"]' in text   # P7: the backstop grant
     assert '"work/*/knowledge/**"' in text
 
     # The engine must accept the result — via the real OPERATION_GRANTS
@@ -198,6 +164,127 @@ def test_ensure_manager_grant_noop_on_starter(tmp_path):
     assert scaffolded.read_text(encoding="utf-8") == text
 
 
+# --- P7: subdomain bind/unbind (nested ownership, spec 07 §3.1) ------------
+
+def test_append_agent_grant_subdomain_shape(tmp_path):
+    """P7 N-4: subdomain bind = write/config/meta on the subdomain + read
+    over the parent; no shared-knowledge glob."""
+    hermes, vault = _scratch(tmp_path)
+    roles = vault / ".vault" / "roles.yaml"
+    installer._append_agent_grant(roles, "bob", "recipes/knowledge")
+    text = roles.read_text(encoding="utf-8")
+    assert 'write: ["work/recipes/knowledge/**"]' in text
+    assert 'config: ["work/recipes/knowledge/**"]' in text
+    assert 'meta: ["work/recipes/knowledge/**"]' in text
+    assert 'read: ["work/recipes/**"]' in text
+    assert '"work/*/knowledge/**"' not in text
+
+    registry = load_roles(vault)
+    assert registry.allows("bob", "create", "work/recipes/knowledge/k.md")
+    assert registry.allows("bob", "read", "work/recipes/projects/idea.md")
+    assert not registry.allows("bob", "create", "work/recipes/projects/x.md")
+
+
+def test_validate_domain_bind_refusals(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    roles = vault / ".vault" / "roles.yaml"
+    with pytest.raises(ValueError, match="one-level subdomain"):
+        installer._validate_domain_bind(roles, "bob", "recipes/knowledge/deep")
+    with pytest.raises(ValueError, match="one-level subdomain"):
+        installer._validate_domain_bind(roles, "bob", "recipes/*")
+    installer._validate_domain_bind(roles, "bob", "recipes")  # fine
+
+
+def test_role_bind_subdomain_flow(tmp_path):
+    """bind --domain creative/knowledge: tree + grants + parent read."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "researcher")
+
+    installer.role_bind(hermes, vault, "researcher",
+                        domain="recipes/knowledge")
+
+    assert (vault / "work" / "recipes" / "knowledge").is_dir()
+    registry = load_roles(vault)
+    assert registry.allows("researcher", "create",
+                           "work/recipes/knowledge/k.md")
+    assert registry.allows("researcher", "read", "work/recipes/projects/x.md")
+    assert not registry.allows("researcher", "create",
+                               "work/recipes/projects/x.md")
+    from vault.ownership import owner_of
+    globs = {n: g.globs("write") for n, g in registry.agents.items()}
+    assert owner_of(globs, "work/recipes/knowledge/k.md") == "researcher"
+
+
+def test_role_bind_refuses_content_as_subdomain(tmp_path):
+    """N-1: same owner as the parent ⇒ content, not a subdomain."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    with pytest.raises(ValueError, match="content, not a subdomain"):
+        installer.role_bind(hermes, vault, "creative",
+                            domain="recipes/knowledge")
+    assert not (vault / "work" / "recipes" / "knowledge").exists()
+
+
+def test_role_bind_refuses_duplicate_ownership(tmp_path):
+    """A subdomain needs a single owner — a second bind is refused."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "researcher")
+    _bound_contributor(hermes, vault, "editor")
+    installer.role_bind(hermes, vault, "researcher",
+                        domain="recipes/knowledge")
+    with pytest.raises(ValueError, match="single owner"):
+        installer.role_bind(hermes, vault, "editor",
+                            domain="recipes/knowledge")
+
+
+def test_role_bind_refuses_deep_path_before_writing(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "creative")
+    with pytest.raises(ValueError, match="one-level subdomain"):
+        installer.role_bind(hermes, vault, "creative",
+                            domain="recipes/knowledge/deep")
+    assert not (vault / "work" / "recipes").exists()
+
+
+def test_role_unbind_subdomain_revokes_and_lifts_shadowing(tmp_path):
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "writer")
+    _bound_contributor(hermes, vault, "researcher")
+    installer.role_bind(hermes, vault, "writer", domain="recipes")
+    installer.role_bind(hermes, vault, "researcher",
+                        domain="recipes/knowledge")
+
+    installer.role_unbind(hermes, vault, "researcher",
+                          domain="recipes/knowledge")
+
+    registry = load_roles(vault)
+    assert not registry.allows("researcher", "create",
+                               "work/recipes/knowledge/k.md")
+    assert not registry.allows("researcher", "read",
+                               "work/recipes/projects/x.md")
+    # shadowing lifts: the writer regains write inside knowledge/
+    assert registry.allows("writer", "create", "work/recipes/knowledge/k.md")
+
+
+def test_role_unbind_subdomain_keeps_parent_read_with_sibling(tmp_path):
+    """Unbinding one subdomain keeps the parent read when another remains."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "researcher")
+    installer.role_bind(hermes, vault, "researcher",
+                        domain="recipes/knowledge")
+    installer.role_bind(hermes, vault, "researcher", domain="recipes/art")
+
+    installer.role_unbind(hermes, vault, "researcher",
+                          domain="recipes/knowledge")
+
+    registry = load_roles(vault)
+    assert not registry.allows("researcher", "create",
+                               "work/recipes/knowledge/k.md")
+    assert registry.allows("researcher", "create", "work/recipes/art/a.md")
+    assert registry.allows("researcher", "read", "work/recipes/projects/x.md")
+
+
 # --- role_bind (P6, 06-growth-design §4.5) ---------------------------------
 
 def _bound_contributor(hermes: Path, vault: Path, name: str) -> Path:
@@ -216,8 +303,9 @@ def test_bind_new_profile_installs_overlay_and_soul(tmp_path):
     assert (target / "SKILL.md").is_symlink()
     soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
     assert "## Vault" in soul_text
-    assert "### Convention manifest" in soul_text
-    assert "<vault>-conventions.md" in soul_text
+    assert "### Convention maintenance" in soul_text
+    assert "obsidian_conventions" in soul_text
+    assert "Convention manifest" not in soul_text   # retired (P7)
 
 
 def test_bind_existing_profile_without_new(tmp_path):
@@ -255,31 +343,27 @@ def test_bind_domain_full_flow(tmp_path):
     assert not registry.allows("creative", "edit_config", ".vault/config.yaml")
     assert not registry.allows("creative", "edit", ".vault/roles.yaml")
 
-    # Conventions file + manifest entry.
-    conv = (profile / "skills" / "note-taking" / "obsidian-vault" / "conventions"
-            / f"{vault.name}-conventions.md")
-    assert conv.is_file()
+    # Conventions are in-tree (P7): the root file was seeded by scaffold;
+    # the SOUL carries the pointer, never domain entries.
+    assert (vault / ".vault" / "conventions.md").is_file()
     soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert "recipes domain conventions (work/recipes/**)" in soul_text
+    assert "### Convention maintenance" in soul_text
+    assert "domain conventions" not in soul_text
 
-    # Idempotent re-run: no duplicate manifest entry, no double grant.
+    # Idempotent re-run: no double grant.
     installer.role_bind(hermes, vault, "creative", domain="recipes")
-    soul_text2 = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert soul_text2.count("recipes domain conventions") == 1
     assert load_roles(vault).allows("creative", "create",
                                     "work/recipes/note.md")
 
 
 def test_bind_domain_on_existing_tree_grants_only(tmp_path):
-    """bind --domain on an already-scaffolded tree = grant + manifest."""
+    """bind --domain on an already-scaffolded tree = grant only (P7)."""
     hermes, vault = _scratch(tmp_path)
-    profile = _bound_contributor(hermes, vault, "creative")
+    _bound_contributor(hermes, vault, "creative")
     (vault / "work" / "notes").mkdir(parents=True)   # pre-existing tree
 
     installer.role_bind(hermes, vault, "creative", domain="notes")
     assert load_roles(vault).allows("creative", "create", "work/notes/a.md")
-    soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert "notes domain conventions (work/notes/**)" in soul_text
 
 
 def test_bind_domain_custom_config_file(tmp_path):
@@ -441,9 +525,8 @@ def test_unbind_domain_unowns_keeps_tree(tmp_path):
     assert not registry.allows("creative", "create", "work/recipes/a.md")
     assert registry.allows("creative", "create", "work/notes/a.md")
     soul_text = (profile / "SOUL.md").read_text(encoding="utf-8")
-    assert "recipes domain conventions" not in soul_text
-    assert "notes domain conventions" in soul_text
-    assert installer.SOUL_ANCHOR in soul_text   # SOUL untouched
+    assert "domain conventions" not in soul_text   # manifest retired (P7)
+    assert installer.SOUL_ANCHOR in soul_text      # SOUL untouched
 
 
 def test_unbind_domain_nothing_held(tmp_path):
@@ -562,7 +645,7 @@ def test_transfer_manager_handoff_demotes_source_to_contributor(tmp_path):
         encoding="utf-8")
 
 
-def test_transfer_domain_moves_ownership_and_manifest(tmp_path):
+def test_transfer_domain_moves_ownership(tmp_path):
     hermes, vault = _scratch(tmp_path)
     a = _bound_contributor(hermes, vault, "alice")
     installer.role_bind(hermes, vault, "alice", domain="recipes")
@@ -574,9 +657,10 @@ def test_transfer_domain_moves_ownership_and_manifest(tmp_path):
     assert not registry.allows("alice", "create", "work/recipes/a.md")
     assert registry.allows("bob", "create", "work/recipes/a.md")
     assert (vault / "work" / "recipes").is_dir()        # tree untouched
-    assert "recipes domain conventions" not in (a / "SOUL.md").read_text(
+    # conventions are in-tree (P7) — neither SOUL carries domain entries
+    assert "domain conventions" not in (a / "SOUL.md").read_text(
         encoding="utf-8")
-    assert "recipes domain conventions" in (b / "SOUL.md").read_text(
+    assert "domain conventions" not in (b / "SOUL.md").read_text(
         encoding="utf-8")
 
 

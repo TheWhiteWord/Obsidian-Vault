@@ -22,7 +22,9 @@ def loaded(vault_with_roles, roles):
     return vault_with_roles, roles
 
 
-def _propose(root, roles, path, proposed, agent="vault_manager", confirm=False):
+def _propose(root, roles, path, proposed, agent="tww", confirm=False):
+    # P7: config edits inside an owned scope are the owner's — tww owns
+    # CREATIVE in the fixture; the manager's config authority is root-level.
     return edit_config(root, agent, roles, path, proposed=proposed,
                        confirm=confirm)
 
@@ -98,32 +100,43 @@ def test_fields_change_applies_with_user_confirmed(loaded):
 
 # --- grants (config kind) ----------------------------------------------------
 
-def test_manager_can_edit_any_config(loaded):
+def test_manager_cannot_edit_owned_config(loaded):
+    """P7 (spec 07 §2.3): config resolves for the derived owner — the
+    manager's config ** no longer reaches inside an owned scope."""
     root, roles = loaded
-    out = _propose(root, roles, "SYSTEM/.vault/config.yaml",
-                   {"fields": {"kind": {"allowed": ["api-reference"]}}},
-                   confirm=True)
+    with pytest.raises(PermissionDenied, match="scope is owned by system"):
+        _propose(root, roles, "SYSTEM/.vault/config.yaml",
+                 {"fields": {"kind": {"allowed": ["api-reference"]}}},
+                 agent="vault_manager", confirm=True)
+
+
+def test_manager_can_edit_root_config(loaded):
+    """The root config is unowned — the manager's config ** applies there."""
+    root, roles = loaded
+    out = _propose(root, roles, ".vault/config.yaml",
+                   {"fields": {"kind": {"allowed": ["api-reference"]}},
+                    "user_confirmed": True},
+                   agent="vault_manager", confirm=True)
     assert out["ok"] is True
 
 
 def test_contributor_without_config_denied(loaded):
     root, roles = loaded
     # `system` (agent) holds write/read/append, no config → denied.
-    with pytest.raises(PermissionDenied):
+    with pytest.raises(PermissionDenied, match="requires 'config'"):
         _propose(root, roles, "SYSTEM/.vault/config.yaml",
                  {"fields": {"kind": {"allowed": ["x"]}}},
                  agent="system")
 
 
 def test_agent_with_config_on_own_tree_allowed(loaded):
-    """D-5: a domain owner holding config on its own tree can edit it."""
+    """D-5/P7: a domain owner holding config on its own tree can edit it."""
     root, roles = loaded
-    # `vault_manager` holds config on ** — the D-5 shape for contributors is
-    # covered by the starter-roles test; here we prove the grant gates.
+    # `tww` owns CREATIVE and holds config on it — the D-5 shape.
     out = _propose(root, roles, "CREATIVE/.vault/config.yaml",
                    {"fields": {"type": {"allowed": ["recipe"]}},
                     "user_confirmed": True},
-                   agent="vault_manager", confirm=True)
+                   agent="tww", confirm=True)
     assert out["ok"] is True
 
 
@@ -161,16 +174,19 @@ def _child_of_knowledge(root) -> str:
     return "CREATIVE/KNOWLEDGE/DEEP/.vault/config.yaml"
 
 
-def test_dropping_inherited_required_refused(loaded):
-    """A child of KNOWLEDGE inherits `source: required`; dropping it there
-    is refused by the real loader (requirements only accumulate)."""
+def test_dropping_inherited_required_is_a_relax(loaded):
+    """P7 (spec 07 §5): a child of KNOWLEDGE may drop the inherited
+    `source: required` — nearest declaration wins; the parent is
+    unaffected."""
     root, roles = loaded
     rel = _child_of_knowledge(root)
-    with pytest.raises(ScaffoldRefused):
-        _propose(root, roles, rel,
-                 {"fields": {"source": {"required": False}},
-                  "user_confirmed": True},
-                 confirm=True)
+    out = _propose(root, roles, rel,
+                   {"fields": {"source": {"required": False}},
+                    "user_confirmed": True},
+                   confirm=True)
+    assert out["ok"] is True and out["changed"] is True
+    text = (root / "CREATIVE/KNOWLEDGE/DEEP/.vault/config.yaml").read_text()
+    assert "required: false" in text
 
 
 def test_redefining_inherited_format_refused(loaded):

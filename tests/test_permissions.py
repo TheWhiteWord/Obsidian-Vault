@@ -56,27 +56,42 @@ class TestWriteBoundary:
 
 
 class TestAppendSemantics:
-    """`append` creates; it must never edit or delete (§2.1)."""
+    """`append` creates; it must never edit or delete (§2.1).
+
+    P7 (spec 07 §2.3): creation inside an owned scope is the owner's — the
+    legacy cross-tree ``*/ISSUES/**`` pattern is shadowed. Append now
+    operates only where no ownership glob matches (an unowned tree), so the
+    semantics tests use ``MISC/ISSUES`` (no canonical owner); the shadowing
+    denial uses ``SYSTEM/ISSUES`` (owned by ``system``).
+    """
 
     def test_append_allows_creating_an_issue(self, vault_with_roles, roles):
         out = write_note(vault_with_roles, "tww", roles,
-                         "SYSTEM/ISSUES/broken-thing.md",
+                         "MISC/ISSUES/broken-thing.md",
                          {**GOOD_FM, "kind": ["issue"], "status": "open"})
         assert out.created is True
 
     def test_append_cannot_edit_an_existing_note(self, vault_with_roles, roles):
-        write_note(vault_with_roles, "tww", roles, "SYSTEM/ISSUES/one.md",
+        write_note(vault_with_roles, "tww", roles, "MISC/ISSUES/one.md",
                    {**GOOD_FM, "kind": ["issue"], "status": "open"})
         with pytest.raises(PermissionDenied, match="may not edit"):
-            write_note(vault_with_roles, "tww", roles, "SYSTEM/ISSUES/one.md",
+            write_note(vault_with_roles, "tww", roles, "MISC/ISSUES/one.md",
                        {**GOOD_FM, "kind": ["issue"], "status": "resolved"},
                        overwrite=True)
 
     def test_append_cannot_delete_even_its_own_note(self, vault_with_roles, roles):
-        write_note(vault_with_roles, "tww", roles, "SYSTEM/ISSUES/two.md",
+        write_note(vault_with_roles, "tww", roles, "MISC/ISSUES/two.md",
                    {**GOOD_FM, "kind": ["issue"], "status": "open"})
         with pytest.raises(PermissionDenied, match="may not delete"):
-            delete_note(vault_with_roles, "tww", roles, "SYSTEM/ISSUES/two.md")
+            delete_note(vault_with_roles, "tww", roles, "MISC/ISSUES/two.md")
+
+    def test_append_is_shadowed_outside_own_scope(self, vault_with_roles, roles):
+        # P7: SYSTEM is owned by `system`; tww's append */ISSUES/** is a
+        # capability glob and grants nothing inside an owned scope.
+        with pytest.raises(PermissionDenied, match="scope is owned by system"):
+            write_note(vault_with_roles, "tww", roles,
+                       "SYSTEM/ISSUES/broken-thing.md",
+                       {**GOOD_FM, "kind": ["issue"], "status": "open"})
 
 
 class TestMetaGrantCannotTouchProse:
@@ -114,11 +129,23 @@ class TestConfigGrant:
     """Only `config` holders may extend a vocabulary (§3.7)."""
 
     def test_registration_requires_the_config_grant(self, vault_with_roles, roles):
+        # `system` owns SYSTEM but holds no config grant → refused for the
+        # grant, exactly as before (P7: the agent is the owner, so shadowing
+        # is not the reason).
         with pytest.raises(PermissionDenied, match="requires 'config'"):
-            write_note(vault_with_roles, "tww", roles,
-                       "CREATIVE/PHILOSOPHY/new.md",
+            write_note(vault_with_roles, "system", roles,
+                       "SYSTEM/HANDBOOK/new.md",
                        {**GOOD_FM, "kind": ["aphorism"]},
                        register={"kind": "aphorism"})
+
+    def test_owner_with_config_can_register(self, vault_with_roles, roles):
+        # D-5/P7: the domain owner holds config on its own tree — registering
+        # in its own domain succeeds.
+        out = write_note(vault_with_roles, "tww", roles,
+                         "CREATIVE/PHILOSOPHY/new.md",
+                         {**GOOD_FM, "kind": ["aphorism"]},
+                         register={"kind": "aphorism"})
+        assert out.registered == {"kind": "aphorism"}
 
     def test_vault_manager_may_register(self, vault_with_roles, roles):
         out = write_note(vault_with_roles, "vault_manager", roles,

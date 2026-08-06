@@ -173,6 +173,7 @@ class TestGrantRole:
         roles.write_text(
             "agents:\n  bob:\n    write: [\"work/creative/**\"]\n"
             "    config: [\"work/creative/**\"]\n"
+            "    meta: [\"work/creative/**\"]\n"
             '    read: ["work/creative/**", "work/*/knowledge/**"]\n',
             encoding="utf-8")
         changed = _grant_role(roles, "bob", "creative")

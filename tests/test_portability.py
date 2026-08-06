@@ -31,9 +31,10 @@ POLICY_NAMES = [
 #: Engine-reserved names — mechanism, not policy. `STATE` (the constant
 #: `constants.STATE_DIRNAME`, value `.state`) is the machine ledger. `ISSUES`
 #: (`constants.ISSUES_DIRNAME`) is the issue ledger — issues are records, not
-#: notes, so the name is engine machinery too. `VAULT` appears in docstrings.
-#: These are exempt from the policy-name guard.
-RESERVED_NAMES = {"STATE", "ISSUES", "VAULT"}
+#: notes, so the name is engine machinery too. `CONVENTIONS`
+#: (`constants.CONVENTIONS_FILENAME`) is the per-scope directive file (P7).
+#: `VAULT` appears in docstrings. These are exempt from the policy-name guard.
+RESERVED_NAMES = {"STATE", "ISSUES", "CONVENTIONS", "VAULT"}
 
 
 class TestNoHardcodedPolicy:

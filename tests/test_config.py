@@ -77,13 +77,29 @@ class TestUniformityContract:
         with pytest.raises(ConfigError, match="may not redefine"):
             resolve_config(vault, vault / "CREATIVE/BAD")
 
-    def test_child_cannot_drop_inherited_required(self, vault):
-        bad = vault / "CREATIVE/LAX/.vault/config.yaml"
-        bad.parent.mkdir(parents=True)
-        bad.write_text("fields:\n  tags: { required: false }\n")
+    def test_child_can_drop_inherited_required(self, vault):
+        """P7 relax (spec 07 §5): nearest declaration wins — a child scope
+        may drop an inherited requirement; the parent scope is unaffected."""
+        lax = vault / "CREATIVE/LAX/.vault/config.yaml"
+        lax.parent.mkdir(parents=True)
+        lax.write_text("fields:\n  tags: { required: false }\n")
 
-        with pytest.raises(ConfigError, match="cannot drop"):
-            resolve_config(vault, vault / "CREATIVE/LAX")
+        child = resolve_config(vault, vault / "CREATIVE/LAX")
+        assert "tags" not in child.required_fields
+
+        parent = resolve_config(vault, vault / "CREATIVE")
+        assert "tags" in parent.required_fields
+
+    def test_dropped_required_field_still_validates_when_present(self, vault):
+        """Relaxing required only waives the presence rule — format/type
+        checks still apply when the field IS supplied."""
+        lax = vault / "CREATIVE/LAX/.vault/config.yaml"
+        lax.parent.mkdir(parents=True)
+        lax.write_text("fields:\n  created: { required: false }\n")
+
+        cfg = resolve_config(vault, vault / "CREATIVE/LAX")
+        assert "created" not in cfg.required_fields
+        assert cfg.fields["created"].get("format") == "date"  # still enforced
 
     def test_malformed_yaml_names_the_file(self, vault):
         bad = vault / "CREATIVE/BROKEN/.vault/config.yaml"
