@@ -758,7 +758,9 @@ overwrite" precedent the replace rule mirrors).
   judge / duty / stewardship / invisible success) — never a fixed
   skeleton. All five enriched; the manager's Perspective is the
   invisible-success paradox (its role IS vault health, the one
-  vault-connected identity).
+  vault-connected identity) + its cross-contributor sight: the manager
+  connects knowledge no single contributor can — links they missed,
+  ambiguous tags (user directive, 2026-08-06).
 - ☑ Identities are **decoupled personas** (review, 2026-08-06): the agent
   IS the persona; the vault is a tool/memory layer expressed by the
   anchored block. The manager is the deliberate exception (its identity
