@@ -91,7 +91,7 @@ Every subcommand supports `--dry-run`.
 ## Development
 
 ```bash
-.venv-test/bin/python -m pytest tests/ -q   # the suite (349 tests)
+.venv-test/bin/python -m pytest tests/ -q   # the suite (354 tests)
 ```
 
 Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·

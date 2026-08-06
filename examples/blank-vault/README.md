@@ -63,6 +63,7 @@ Once a domain exists:
 |---|---|
 | Create the first domain (and its contributor) | the **manager** |
 | Add another domain later | the **manager** |
+| Run something on a schedule (e.g. "every morning, collect the latest from site X into my notes") | the **manager** |
 | Create or edit notes and sub-folders in a domain | that domain's **contributor** |
 
 - **Until the first domain exists, one agent may play every role** — the
@@ -85,8 +86,9 @@ index, a note missing a required field), the vault files it, and the agent
 that owns the affected folder is the one that fixes it.
 
 - Any agent can report a problem; the owner of the folder resolves it.
-- The manager runs a **maintenance sweep** every night (a full check on
-  Mondays) that catches problems before you notice them.
+- The manager runs a **maintenance sweep** every night while your agent is
+  running (a full check on Mondays) that catches problems before you notice
+  them.
 - Ask the manager for a health report anytime — what's open, what's being
   fixed, what's been declined.
 

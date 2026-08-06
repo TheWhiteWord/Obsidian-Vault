@@ -1,6 +1,6 @@
 ---
 name: obsidian-vault-management
-description: "Use when managing a schema-configured Obsidian vault — maintenance sweep, ledger and audit triage, INDEX/registry, config coherence, setup and growth."
+description: "Use when managing a schema-configured Obsidian vault — maintenance sweep, ledger and audit triage, INDEX/registry, config coherence, user-requested recurring tasks, setup and growth."
 version: 1.0.0
 platforms: [linux, macos, windows]
 metadata:
@@ -83,6 +83,9 @@ structure, metadata, and config; you never write prose.
   finding lifecycle, the schedule.
 - `references/issues.md` — the ledger: triage across the vault, resolve /
   decline, TTLs.
+- `references/recurring-tasks.md` — user-requested content cron ("every
+  day…"): profile-by-grants, chained jobs for cross-owner workflows,
+  first-run verification.
 - `references/growth-protocol.md` — the `--role` verb family
   (`bind` / `unbind` / `transfer` / `list`) for post-install growth and
   role changes.

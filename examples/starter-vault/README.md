@@ -62,6 +62,7 @@ What you can move yourself, and what goes through the manager:
 | Write in a domain's `knowledge/` (a subdomain) | the **researcher** |
 | Add a new domain, or a new contributor | the **manager** |
 | Change vault-wide rules (schema, who has access) | the **manager** |
+| Run something on a schedule (e.g. "every morning, collect the latest from site X into my notes") | the **manager** |
 | Fix something broken (broken link, stale index) | the **manager**, or the contributor who owns that folder |
 
 - **Contributors write only their own domain** — and their domain's
@@ -84,8 +85,9 @@ index, a note missing a required field), the vault files it, and the agent
 that owns the affected folder is the one that fixes it.
 
 - Any agent can report a problem; the owner of the folder resolves it.
-- The manager runs a **maintenance sweep** every night (a full check on
-  Mondays) that catches problems before you notice them.
+- The manager runs a **maintenance sweep** every night while your agent is
+  running (a full check on Mondays) that catches problems before you notice
+  them.
 - Ask the manager for a health report anytime — what's open, what's being
   fixed, what's been declined.
 
