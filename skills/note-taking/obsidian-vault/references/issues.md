@@ -68,6 +68,7 @@ an optional `reason`.
 2. `obsidian_issue` with `items: [{subject, detail, target}]`.
 3. `obsidian_issue_list` (optionally filtered) to track it.
 4. Resolution comes from whoever holds write/meta over the target — the
-   sweep for census findings, the domain owner for content judgment.
+   sweep for census findings, the owning agent (subdomain owner, else
+   domain contributor) for content judgment.
    Resolve it yourself when you own the target and the call is yours to
    make.

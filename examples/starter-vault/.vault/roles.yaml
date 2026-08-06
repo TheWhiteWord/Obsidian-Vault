@@ -40,16 +40,21 @@ agents:
   creative:
     write:  ["work/creative/**"]
     config: ["work/creative/**"]
+    meta:   ["work/creative/**"]
     read:   ["work/creative/**", "work/*/knowledge/**"]
   dev:
     write:  ["work/coding/**"]
     config: ["work/coding/**"]
+    meta:   ["work/coding/**"]
     read:   ["work/coding/**", "work/*/knowledge/**"]
 
   # Shared research domain — provides research for every domain. Owns all
   # knowledge folders under work/ (and their INDEXes); read access to system
-  # records.
+  # records. Knowledge is a literal owned subdomain (P7): the domain owners'
+  # write inside it is shadowed to the researcher. The wildcard read glob
+  # survives — research reads every domain's knowledge.
   researcher:
-    write:  ["work/*/knowledge/**"]
-    config: ["work/*/knowledge/**"]
+    write:  ["work/creative/knowledge/**", "work/coding/knowledge/**"]
+    config: ["work/creative/knowledge/**", "work/coding/knowledge/**"]
+    meta:   ["work/creative/knowledge/**", "work/coding/knowledge/**"]
     read:   ["work/*/knowledge/**", "system/**"]

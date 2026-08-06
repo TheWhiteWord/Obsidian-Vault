@@ -52,10 +52,17 @@ python3 scripts/roles.py --vault /path/to/vault \
 
 Creates `work/DOMAIN/` + `.vault/config.yaml` (from `--config`, or a minimal
 stub) when missing, appends the owner's grant block to `roles.yaml`
-(`write`/`config` on `work/DOMAIN/**`, `read` + the shared
-`work/*/knowledge/**`), seeds the owner's maintained conventions file from
-the template, and appends the manifest entry to the owner's SOUL. On an
+(`write`/`config`/`meta` on `work/DOMAIN/**` — `meta` is the backstop grant,
+P7 — plus `read`, and the shared `work/*/knowledge/**` read). Conventions
+live in-tree (spec 07): nothing is seeded or registered in a SOUL. On an
 already-scaffolded tree it grants only.
+
+`--domain` takes a path, so a **subdomain** binds too (`--domain
+creative/knowledge`): a folder owned by another agent inside a domain. Only
+one level deep; a profile that already owns the parent gets a refusal (same
+owner ⇒ content — use `obsidian_scaffold`), and an ownership glob another
+agent already holds is refused as well — which keeps `work/*/knowledge/**`
+the researcher's alone.
 
 ## Binding a manager
 
@@ -83,16 +90,41 @@ python3 scripts/roles.py --vault /path/to/vault --role list
   overlay, drops the vault env vars. Owned domain trees remain — the notice
   says to remove them manually. **Refuses for the manager** (a vault must
   keep one) — use `transfer`.
-- `unbind --domain` unowns just that domain: globs revoked, manifest entry
-  removed, tree kept.
+- `unbind --domain` unowns just that domain: globs revoked, tree kept.
 - `transfer` without `--domain` hands off the **manager role**: the successor
   is re-derived (combined when it already holds content grants), the old
   manager is re-derived from its remaining grants (contributor surface, or
   full unbind when nothing remains).
-- `transfer --domain` moves domain ownership A→B in one step (grants +
-  manifest entry; both stay contributors).
+- `transfer --domain` moves domain ownership A→B in one step (grants; both
+  stay contributors).
 - `default` is unbound-able (the skill stays reachable as
   `plugin:obsidian-vault`) — the operation warns.
+
+## Renames and relocation
+
+There is no rename verb — a domain rename is `unbind` + `bind`:
+
+```bash
+python3 scripts/roles.py --vault /path/to/vault --role unbind PROFILE --domain OLD
+python3 scripts/roles.py --vault /path/to/vault --role bind PROFILE --domain NEW
+```
+
+The old globs are revoked, the new ones granted; the tree is whatever the
+user already renamed it to. Do this right after a rename — until then the
+domain is unowned and nobody can write to it.
+
+- **Detecting a rename:** the manager's verify step (grant-anchor check)
+  catches the mismatch — a `work/` write-glob whose base no longer exists.
+  Raise the issue first, then run the two commands.
+- **The vault itself is NOT a growth operation.** Its location is wired into
+  every bound profile's `.env` (`OBSIDIAN_VAULT_PATH`); renaming the folder
+  disconnects all agents, and the ledger lives inside the vault so nothing
+  can see the break. Recovery = re-run the setup questionnaire at the new
+  location — not `--role`.
+- **Conventions are in-tree (spec 07), so they follow the folder.** The
+  root `.vault/conventions.md`, or the scope's own — a rename moves them
+  with the tree; nothing re-registers. (The old per-profile
+  `conventions/<vault>-conventions.md` + SOUL manifest model is retired.)
 
 ## Pitfalls
 

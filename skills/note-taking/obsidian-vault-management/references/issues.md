@@ -58,8 +58,10 @@ closable.
   findings; manual resolution is for what it cannot see.
 - `declined` with an honest `reason` when an issue is not actionable — the
   reason is what the raiser sees.
-- Content judgment stays with the domain owner: when closing would mean
-  deciding content for someone else's domain, escalate instead of deciding.
+- Content judgment stays with the owning agent (the subdomain owner for
+  `knowledge/` findings, else the domain contributor): when closing would
+  mean deciding content for someone else's tree, escalate instead of
+  deciding.
 
 ## The sweep in the ledger
 

@@ -55,7 +55,7 @@ fields:
 |---|---|---|
 | `allowed` | **union** — child adds to the inherited list (order-preserving, deduped) | broadens what passes validation |
 | `allowed_only` | **replace** — child's list *is* the vocabulary; marks `restricted` | narrows the field to exactly these values (e.g. `allowed_only: [knowledge]`) |
-| `required` | **accumulate only** — a child may add, never drop (`ConfigError` if it tries) | makes a field mandatory for future notes |
+| `required` | **relaxable** — nearest declaration wins: a child may add a requirement or drop an inherited one (P7.2) | makes a field mandatory for future notes |
 | `multi` / `format` | **immutable** once any ancestor sets them (uniformity contract) | shape of the value cannot drift down the tree |
 | `vocabulary: true` | flag | the field participates in declared/observed/unused tracking |
 
@@ -86,7 +86,8 @@ agent can *read* (that is grants, deny-by-default).
 
 **Must not:**
 - Hand-edit raw YAML config files — the tools exist precisely to keep config engine-digestible and audit-trailed.
-- Drop an inherited `required`, redefine `format`/`multi`, or remove a field — `ConfigError` and refused.
+- Redefine `format`/`multi` or remove a field — `ConfigError` and refused.
+  Dropping an inherited `required` is a relax and allowed (P7.2).
 - Hand-edit `roles.yaml` — your config grant never covers it; the growth protocol changes it.
 - Write an issue as a note, or a note where the schema says otherwise (type/kind are enforced).
 

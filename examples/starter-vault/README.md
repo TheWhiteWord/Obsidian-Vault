@@ -24,17 +24,50 @@ VAULT/
     └── coding/        # coding work: knowledge/ + projects/
 ```
 
+## Three levels — domains, content, subdomains
+
+The vault works on three levels, and they behave differently:
+
+- **Domains** sit at the vault root (`work/creative/`, `work/coding/`). Each
+  has an owner and its own rules.
+- **Content folders** live inside a domain (`knowledge/`, `projects/`, or
+  anything you add). They are ordinary folders — the vault adapts to them
+  automatically.
+- **Subdomains** are content folders owned by *another* agent. In the
+  starter vault, `work/*/knowledge/` is the researcher's subdomain, not the
+  domain contributor's. A folder owned by someone else is a manager
+  conversation; a folder whose owner stays the same is content forever.
+
+What you can move yourself, and what goes through the manager:
+
+- **Inside a domain, organise freely.** Create, rename, and move content
+  folders whenever you like; indexes and search follow along. If you rename
+  one, links pointing at the old name may break — the nightly sweep files
+  them, and the domain's contributor fixes them. Your domain's subdomains
+  are not yours to reorganise — they belong to another agent.
+- **Domains are a manager conversation.** A domain carries its owner and
+  access rules under its name, so creating or renaming one re-points those
+  with it. Ask the manager; it happens in one step.
+- **Never rename the vault folder itself.** Every agent is wired to the
+  vault by its exact location — renaming it disconnects them all, and
+  nothing inside can repair itself. If the vault must move, tell the
+  manager *before* you do; it is re-attached with a fresh setup, and each
+  domain's rules start over.
+
 ## Who does what — ask the right agent
 
 | You want to… | The role that handles it |
 |---|---|
-| Create or edit notes in a domain | that domain's **contributor** |
+| Create or edit notes and sub-folders in a domain | that domain's **contributor** |
+| Write in a domain's `knowledge/` (a subdomain) | the **researcher** |
 | Add a new domain, or a new contributor | the **manager** |
 | Change vault-wide rules (schema, who has access) | the **manager** |
 | Fix something broken (broken link, stale index) | the **manager**, or the contributor who owns that folder |
 
-- **Contributors write only their own domain.** A note in one domain can't
-  be edited by another domain's contributor — ask the owner.
+- **Contributors write only their own domain** — and their domain's
+  subdomains are read-only to them. A note in one domain can't be edited by
+  another domain's contributor; a note in `knowledge/` belongs to the
+  researcher. Ask the owner.
 - **The manager maintains, it doesn't write prose.** It restructures,
   sweeps for problems, and changes rules, but never edits your content.
 - **One profile can hold several roles.** A single-agent setup puts

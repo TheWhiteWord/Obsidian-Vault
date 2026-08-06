@@ -23,9 +23,9 @@ issues. Do **not** load for plain file operations outside a vault.
 1. **`obsidian_context(folder)`** first — it returns the effective schema,
    vocabulary, tags, defaults, validation mode, sibling notes, and your grants
    for the folder.
-2. **Load the conventions registered for that folder** in your SOUL Convention
-   manifest — each entry names the folder it covers — then verify the note
-   against them and this skill's writing rules.
+2. **`obsidian_conventions(folder)`** — load the conventions registered for
+   that folder (in-tree, nearest scope wins) and verify the note against them
+   and this skill's writing rules.
 3. Then write. `obsidian_write`/`obsidian_edit_metadata`/`obsidian_delete`/
    `obsidian_scaffold`/`obsidian_index` enforce grants and validation
    themselves — the conventions check is *your* responsibility.
@@ -45,6 +45,7 @@ issues. Do **not** load for plain file operations outside a vault.
 | Find notes by term | `obsidian_search` |
 | Follow wikilinks (neighbors, hops, dangling) | `obsidian_graph` |
 | Discover config options + grant kinds | `obsidian_reference` |
+| Load the conventions that govern this folder | `obsidian_conventions` |
 | Raise / list / resolve ledger issues | `obsidian_issue` · `obsidian_issue_list` · `obsidian_issue_resolve` |
 
 ## Knowledge layout — bundled vs maintained
@@ -53,15 +54,19 @@ issues. Do **not** load for plain file operations outside a vault.
 profiles — do not modify them; a change propagates to every profile, and only a
 direct user instruction overrides this.
 
-`conventions/` holds real per-profile files, yours to grow: the maintained
-conventions files described below.
+No per-profile conventions live here anymore — conventions moved **in-tree**
+(spec 07): the vault's own `.vault/conventions.md`, optionally per scope,
+loaded via `obsidian_conventions`. An empty `conventions/` dir left over from
+older installs is an artifact of the previous model — ignore it; nothing
+maintains it.
 
 ## Writing rules
 
 **Before writing**
 
 - Call `obsidian_context(folder)` — know the schema, your grants, the tags.
-- Load the conventions registered for the folder (see the writing loop).
+- Load the folder's conventions (`obsidian_conventions(folder)` — see the
+  writing loop).
 
 **While writing**
 
@@ -80,19 +85,17 @@ conventions files described below.
 
 ## Maintaining conventions
 
-The maintained file is `conventions/<vault>-conventions.md` — by default one
-per vault, shared by the folders you manage. A folder whose rules genuinely
-diverge gets its own file (e.g. `conventions/<folder>-conventions.md`) — a
-deliberate decision, taken when the user asks for different rules there. Every
-file is registered in your SOUL Convention manifest, with the folder it
-covers.
+Conventions live **in the vault, in-tree**: `.vault/conventions.md` at the
+root, optionally one per scope (a folder's own `.vault/conventions.md`).
+`obsidian_conventions(folder)` walks the chain — nearest file wins — so
+writing under a scope loads exactly that scope's rules.
 
 It grows through interaction:
 
 - **What goes in:** user corrections about *how to write* — style, structure,
   tags, format — and standing preferences. Record them so the next session
-  doesn't relearn them. The manifest line's description says which domain a
-  file covers.
+  doesn't relearn them. A scope's file stays scoped; vault-wide rules go in
+  the root file.
 - **What does not:** vault content decisions (what the vault contains) — those
   live in the vault, not in conventions.
 - **Process:** propose → confirm → record. Keep the file tight; it is loaded on
@@ -108,16 +111,17 @@ hand-create folders or configs.
    `references/config-authoring.md`). The proposal shows what would change;
    structural keys need user confirmation.
 2. No registration step — your grant covers `work/<domain>/**`, so the new
-   folder is inside your domain from birth. The SOUL manifest entry (added
-   by `scripts/roles.py --role bind --domain`) already covers the domain's
-   conventions. Only a genuinely separate domain needs new grants — ask the
-   manager (`scripts/roles.py --vault <vault> --role bind <you> --domain
-   <name>` to add, `scripts/roles.py --vault <vault> --role transfer <you>
-   --to <other> --domain <name>` to hand it off).
+   folder is inside your domain from birth, and conventions are already
+   covered in-tree (the root file, or the scope's own). Only a genuinely
+   separate domain needs new grants — ask the manager (`scripts/roles.py
+   --vault <vault> --role bind <you> --domain <name>` to add,
+   `scripts/roles.py --vault <vault> --role transfer <you> --to <other>
+   --domain <name>` to hand it off). A folder handed to another agent
+   becomes a **subdomain** — read-only to you; its owner is the one to ask.
 3. When the new folder's rules genuinely diverge from your main conventions,
-   express them in its `.vault/config.yaml` (the scaffold delta) — the
-   conventions file and the SOUL manifest stay domain-scoped and
-   installer-managed (no manual registration).
+   give the folder its own `.vault/conventions.md` or express the field
+   delta in its config (the scaffold) — a content-layer decision, no
+   registration anywhere.
 
 ## References — load what the task needs
 
@@ -137,7 +141,7 @@ Load only what the task calls for; never load all references up front.
 ## Verification
 
 - [ ] Called `obsidian_context` for the folder before writing.
-- [ ] Loaded the conventions registered for this folder (SOUL manifest) and
+- [ ] Loaded this folder's conventions (`obsidian_conventions(folder)`) and
       verified the note against them.
 - [ ] Note has valid frontmatter per the effective schema (see context).
 - [ ] New note is linked from its folder's INDEX (regenerated on write).

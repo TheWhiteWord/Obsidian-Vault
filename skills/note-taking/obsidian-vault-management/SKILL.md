@@ -24,12 +24,24 @@ domains).
    for the folder.
 2. **Verify the vault** — both checks feed the ledger, nothing acts yet:
    - **Sweep:** `obsidian_maintain` (delta / maintain / optimize) — findings
-     become ledger issues.
+     become ledger issues. `optimize` proposes link/index connections —
+     suggestions only, never auto-applied; the affected owner confirms.
    - **README drift check:** compare the orientation doc's Tree section
      against the live vault. Drift → raise a `[maintenance]` issue targeted
      at `README.md`.
+   - **Grant-anchor check:** every folder under `work/` must be covered by
+     some `write` glob, and every literal `work/…/**` write glob's base must
+     still exist. A bare folder (hand-created, no owner) or a glob base that
+     no longer exists (renamed domain) is policy breakage — raise a
+     `[maintenance]` issue targeted at the affected tree. Wildcard globs
+     (`work/*/knowledge/**`) self-adapt — never a finding; standing globs
+     whose tree never existed (`system/**` on a blank vault) are not in
+     scope.
 3. **Triage:** `obsidian_issue_list` + `obsidian_audit` — sweep findings,
-   README drift, and anomalies, newest first.
+   README drift, and anomalies, newest first. Route each issue to the
+   **owner of the folder it targets**: a finding inside a subdomain
+   (`work/*/knowledge/**`) goes to the subdomain's owner first, then to the
+   domain contributor if that owner declines.
 4. **Act within your remit:** fix structure and metadata; escalate content
    judgments to the domain owner as ledger issues.
 
@@ -46,6 +58,7 @@ domains).
 | Find notes by term | `obsidian_search` |
 | Follow wikilinks (neighbors, hops, dangling) | `obsidian_graph` |
 | Discover config options + grant kinds | `obsidian_reference` |
+| Load the conventions that govern a folder | `obsidian_conventions` |
 | Raise / list / resolve ledger issues | `obsidian_issue` · `obsidian_issue_list` · `obsidian_issue_resolve` |
 
 ## Your remit — maintain, don't author
@@ -55,8 +68,10 @@ structure, metadata, and config; you never write prose.
 
 - **Apply yourself (AUTO):** INDEX/registry regeneration, vocabulary
   promotion, frontmatter coherence.
-- **Escalate:** content judgment stays with the domain owner — when a finding
-  needs a content decision, raise it as a ledger issue; the owner decides.
+- **Escalate:** content judgment stays with the owning agent — the subdomain
+  owner for findings inside `knowledge/`, else the domain contributor. When a
+  finding needs a content decision, raise it as a ledger issue; the owner
+  decides.
 - **Raise, don't silently fix:** structural breakage (broken config, schema
   drift) becomes a ledger issue — visibility first.
 - **Never by hand:** structural changes (new contributors, domains, configs)
@@ -82,6 +97,7 @@ Load only what the task calls for; never load all references up front.
 
 - [ ] Ran `obsidian_maintain` before triage (or know why not).
 - [ ] Checked the README's Tree section against the live vault — drift raised as an issue.
+- [ ] Checked grant anchors (every `work/` folder covered by a write glob; every literal glob base exists) — mismatches raised as issues.
 - [ ] Triage covered the ledger and the audit trail.
 - [ ] Content judgments escalated as issues, not self-resolved.
 - [ ] AUTO actions applied within grants only.
@@ -93,6 +109,12 @@ Load only what the task calls for; never load all references up front.
   issue for the system owner (`default`) to apply.
 - Hand-editing `roles.yaml` or config files — the growth subcommands and
   `obsidian_edit_config` exist.
+- Treating a renamed domain as a README-only problem — the grant globs
+  break too; recover with `unbind --domain OLD` + `bind --domain NEW` (no
+  rename verb — growth-protocol.md).
+- A renamed or moved vault folder is unreachable — no tool or check can see
+  it (the ledger lives inside it); recovery is the setup questionnaire, not
+  `--role`.
 - Running the sweep with `dry_run` or `distribute: false` and forgetting the
   findings — they are the triage input.
 - Treating suggestions as auto-fixable — they are never auto-applied.

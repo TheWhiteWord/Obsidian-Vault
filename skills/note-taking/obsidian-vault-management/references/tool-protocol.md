@@ -15,6 +15,8 @@ How the `obsidian_*` tools behave.
   `obsidian_issue_list` needs `read` over the target; `obsidian_issue_resolve`
   needs `write`/`meta` over the target.
 - `obsidian_reference` — none (it is the self-documentation).
+- `obsidian_conventions` — reading needs none (any registered agent); the
+  edit mode (`path` + `content`) needs `write` over the containing scope.
 
 Write-gated tools (`obsidian_write`, `obsidian_delete`, `obsidian_scaffold`)
 are not in your remit — your grants hold no content `write`; structural work
