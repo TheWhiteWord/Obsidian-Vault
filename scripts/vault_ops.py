@@ -941,6 +941,61 @@ def _domain_config_stub(domain: str) -> str:
     )
 
 
+def _system_config_stub() -> str:
+    """Minimal honest config for the system tree — extends the root schema
+    with no vocabulary of its own. The owner evolves fields afterwards via
+    obsidian_edit_config (mechanical, tool-mediated); the starter preset
+    ships the full system-records vocabulary instead (spec/record/...)."""
+    return (
+        "# system — system-records config (growth protocol)\n"
+        "# Extends the root schema via union. Declare what this tree adds\n"
+        "# or changes; never re-declare root fields.\n"
+        "# E.g.:\n"
+        "#   fields:\n"
+        "#     kind:\n"
+        "#       allowed: [spec, decision, log]\n"
+    )
+
+
+def _validate_system_bind(roles_path: Path, profile: str) -> None:
+    """Refuse a ``--system`` bind whose ownership glob is already held.
+
+    The system tree has a single owner, like any domain: another agent
+    holding ``system/**`` makes ownership ambiguous (P7). Raises before
+    any write — the caller runs this before creating anything.
+    """
+    from vault.grants import load_roles
+    from vault.ownership import duplicate_ownership_globs
+
+    roles = load_roles(roles_path.parent.parent)
+    others = {name: g.globs("write")
+              for name, g in roles.agents.items() if name != profile}
+    conflicts = duplicate_ownership_globs({**others, profile: ["system/**"]})
+    if conflicts:
+        raise ValueError(
+            f"refusing --system: {conflicts[0]} — the system tree needs a "
+            f"single owner")
+
+
+def _append_system_grant(roles_path: Path, owner: str,
+                         dry_run: bool = False) -> bool:
+    """Ensure the owner's grant block covers the system tree (``system/**``).
+
+    The system tree is the reserved root content tree (handbook, logs,
+    decisions — the standard preset's shape). A ``--system`` bind grants
+    write + config on it, exactly like the starter preset's ``default``
+    block; the tree + config are created in role_bind before this runs.
+    """
+    if not roles_path.is_file():
+        raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
+    needed = [
+        ("write", ["system/**"]),
+        ("config", ["system/**"]),
+    ]
+    return _ensure_agent_block(roles_path, owner, needed,
+                               dry_run=dry_run, label="system")
+
+
 def _ensure_manager_grant(roles_path: Path, manager: str,
                           dry_run: bool = False) -> bool:
     """Activate the manager's grant block in roles.yaml (blank preset).
@@ -1255,19 +1310,28 @@ def _surface_for_roles(hermes_home: Path, profile: str, roles: set[str],
 def role_bind(hermes_home: Path, vault_root: Path, profile: str,
               new: bool = False, manager_role: bool = False,
               domain: str = "", config_file: str = "",
-              dry_run: bool = False) -> None:
+              system_tree: bool = False, dry_run: bool = False) -> None:
     """Bind a profile to the vault (§4.5): ability surface + grants.
 
-    Without ``--domain``: profile-level bind (skill overlay + SOUL variant
-    + config seed + plugin enable + env) as contributor or ``--manager``.
+    Without ``--domain``/``--system``: profile-level bind (skill overlay +
+    SOUL variant + config seed + plugin enable + env) as contributor or
+    ``--manager``.
     With ``--domain`` (contributor-only): also create ``work/<name>/`` +
     ``.vault/config.yaml`` (stub or ``--config``) when missing and grant
-    it. Idempotent. Refuses: ``--manager`` with ``--domain``; a domain
-    bind on the manager profile (managers hold no content grants).
+    it.
+    With ``--system`` (contributor-only): also create the reserved system
+    tree ``system/`` + its config (stub or ``--config``) and grant
+    write/config over ``system/**`` — the standard preset's ``default``
+    block, made reachable as a growth action.
+    Idempotent. Refuses: ``--manager`` with ``--domain`` or ``--system``;
+    a domain/system bind on the manager profile (managers hold no content
+    grants).
     """
-    if manager_role and domain:
-        raise ValueError("--manager and --domain are mutually exclusive "
-                         "(managers hold no content grants)")
+    if manager_role and (domain or system_tree):
+        raise ValueError("--manager and --domain/--system are mutually "
+                         "exclusive (managers hold no content grants)")
+    if domain and system_tree:
+        raise ValueError("--domain and --system are mutually exclusive")
     import yaml
     roles_path = vault_root / ".vault" / "roles.yaml"
     if not roles_path.is_file():
@@ -1308,6 +1372,31 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         if dry_run:
             print(f"[dry-run] mkdir {domain_dir} + .vault/config.yaml")
         _append_agent_grant(roles_path, profile, domain, dry_run=dry_run)
+    elif system_tree:
+        if _manager_profile(roles_path) == profile:
+            raise ValueError(
+                f"{profile} is the manager — managers hold no content "
+                f"grants; bind a contributor profile instead")
+        # Refuse before any write — duplicate ownership must not create a
+        # directory first.
+        _validate_system_bind(roles_path, profile)
+        sys_dir = vault_root / "system"
+        if not sys_dir.is_dir() and not dry_run:
+            (sys_dir / ".vault").mkdir(parents=True, exist_ok=True)
+            if config_file:
+                cfg = Path(config_file)
+                if not cfg.is_file():
+                    raise FileNotFoundError(f"config file not found: {cfg}")
+                raw = cfg.read_text(encoding="utf-8")
+                yaml.safe_load(raw)  # refuse to ship broken YAML
+                (sys_dir / ".vault" / "config.yaml").write_text(
+                    raw, encoding="utf-8")
+            else:
+                (sys_dir / ".vault" / "config.yaml").write_text(
+                    _system_config_stub(), encoding="utf-8")
+        if dry_run:
+            print(f"[dry-run] mkdir {sys_dir} + .vault/config.yaml")
+        _append_system_grant(roles_path, profile, dry_run=dry_run)
     # surface aligned to the (now) live grants — combined when the profile
     # already held content grants and is now also the manager
     existing = _roles_from_grants(roles_path, profile)
@@ -1319,7 +1408,8 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         seed_profile_config(hermes_home, profile)
         enable_plugin_for_profile(hermes_home, profile, vault_root)
     print(f"bound {profile}: {skill_role}"
-          + (f" + domain work/{domain}/**" if domain else ""))
+          + (f" + domain work/{domain}/**" if domain else "")
+          + (" + system tree (system/**)" if system_tree else ""))
 
 
 def role_unbind(hermes_home: Path, vault_root: Path, profile: str,

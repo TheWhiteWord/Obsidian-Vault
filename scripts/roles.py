@@ -8,7 +8,7 @@ the live roles.yaml block; unbind comments the block out (deny-by-default,
 re-bindable) and removes the SOUL block; the vault must always keep a
 manager (transfer hands it off).
 
-    python3 scripts/roles.py --vault <path> --role bind PROFILE [--new] [--manager] [--domain PATH] [--config FILE]
+    python3 scripts/roles.py --vault <path> --role bind PROFILE [--new] [--manager] [--domain PATH] [--system] [--config FILE]
     python3 scripts/roles.py --vault <path> --role unbind PROFILE [--domain PATH]
     python3 scripts/roles.py --vault <path> --role transfer PROFILE --to SUCCESSOR [--domain PATH]
     python3 scripts/roles.py --vault <path> --role list
@@ -31,7 +31,8 @@ def main() -> int:
     ap.add_argument("--vault", help="Vault root path (required)")
     ap.add_argument("--role", choices=["bind", "unbind", "transfer", "list"],
                     help=("bind: attach a profile (--new creates it; --manager "
-                          "promotes; --domain grants work/<NAME>/**) | unbind: "
+                          "promotes; --domain grants work/<NAME>/**; --system "
+                          "grants the reserved system/** tree) | unbind: "
                           "detach (--domain unowns only) | transfer: hand the "
                           "manager role or a domain off (--to NEW) | list: "
                           "show current bindings"))
@@ -43,13 +44,17 @@ def main() -> int:
                     help="(bind) create the profile first")
     ap.add_argument("--manager", action="store_true",
                     help="(bind) bind as manager (mutually exclusive with "
-                         "--domain \u2014 managers hold no content grants)")
+                         "--domain/--system \u2014 managers hold no content grants)")
     ap.add_argument("--domain", metavar="PATH",
-                    help="(bind/unbind/transfer) operate on work/<PATH>/** — "
+                    help="(bind/unbind/transfer) operate on work/<PATH>/** \u2014 "
                          "a domain ('creative') or a one-level subdomain "
                          "path ('creative/knowledge')")
+    ap.add_argument("--system", action="store_true",
+                    help="(bind) bind as the system-tree owner \u2014 creates "
+                         "system/ + the write/config grant (mutually "
+                         "exclusive with --domain and --manager)")
     ap.add_argument("--config", metavar="FILE",
-                    help="(bind --domain) prepared .vault/config.yaml "
+                    help="(bind --domain/--system) prepared .vault/config.yaml "
                          "(default: minimal stub)")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print actions without performing them")
@@ -71,7 +76,7 @@ def main() -> int:
         role_bind(hermes_home, vault_root, args.profile,
                   new=args.new, manager_role=args.manager,
                   domain=args.domain or "", config_file=args.config or "",
-                  dry_run=args.dry_run)
+                  system_tree=args.system, dry_run=args.dry_run)
     elif args.role == "unbind":
         if not args.profile:
             ap.error("--role unbind requires PROFILE")
