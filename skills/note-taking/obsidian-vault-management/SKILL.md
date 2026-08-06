@@ -33,10 +33,11 @@ domains).
      some `write` glob, and every literal `work/…/**` write glob's base must
      still exist. A bare folder (hand-created, no owner) or a glob base that
      no longer exists (renamed domain) is policy breakage — raise a
-     `[maintenance]` issue targeted at the affected tree. Wildcard globs
-     (`work/*/knowledge/**`) self-adapt — never a finding; standing globs
-     whose tree never existed (`system/**` on a blank vault) are not in
-     scope.
+     `[maintenance]` issue targeted at the affected tree. The same applies
+     to `system/**`: a bind always creates the tree, so a missing base is
+     a rename symptom, never a standing grant (blank presets ship no
+     standing content globs). Wildcard globs (`work/*/knowledge/**`)
+     self-adapt — never a finding.
 3. **Triage:** `obsidian_issue_list` + `obsidian_audit` — sweep findings,
    README drift, and anomalies, newest first. Route each issue to the
    **owner of the folder it targets**: a finding inside a subdomain

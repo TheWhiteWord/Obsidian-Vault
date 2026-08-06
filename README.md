@@ -59,6 +59,9 @@ are the agent's grammar and your reference for what's possible:
 ```bash
 # bind a contributor profile (--new creates it); --domain adds a domain
 python3 scripts/roles.py --vault <path> --role bind <NAME> [--new] [--domain <DOMAIN>] [--config <FILE>]
+# bind the system-tree owner — creates system/ + the write/config grant
+# (the standard preset's `default` block, available as a growth action)
+python3 scripts/roles.py --vault <path> --role bind <NAME> --system
 # bind a manager (a contributor who becomes the manager gets the combined surface)
 python3 scripts/roles.py --vault <path> --role bind <NAME> --manager
 # hand the manager role off (the successor is re-derived; the old manager
@@ -91,7 +94,7 @@ Every subcommand supports `--dry-run`.
 ## Development
 
 ```bash
-.venv-test/bin/python -m pytest tests/ -q   # the suite (354 tests)
+.venv-test/bin/python -m pytest tests/ -q   # the suite (360 tests)
 ```
 
 Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·

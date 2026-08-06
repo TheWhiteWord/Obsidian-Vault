@@ -14,14 +14,14 @@ agents:
   # `.hermes`-wide reach; uses the plugin as one tool among many. In a blank
   # vault with no domains yet, `default` is the only active agent.
   #
-  # `system/**` is a STANDING permission, not a pre-created tree: the blank
-  # preset ships no folders (that is the standard preset's shape), and the
-  # engine materialises the tree on first write — or when the user's own
-  # tree includes it. Same standing nature as `read: ["**"]`.
+  # No system tree ships in a blank vault — it starts with just the root
+  # documents. The system tree (`system/`: handbook, logs, decisions) is
+  # created on demand: `--role bind <name> --system` brings it into being
+  # with its write/config grant together, like any domain.
   # Also holds the vault-root README.md — the orientation doc is a system
   # document, so the manager's README-drift findings have an owner.
   default:
-    write:  ["system/**", "README.md", ".vault/conventions.md"]
+    write:  ["README.md", ".vault/conventions.md"]
     read:   ["**"]
 
   # Manager — maintenance only. Structurally incapable of altering prose:
