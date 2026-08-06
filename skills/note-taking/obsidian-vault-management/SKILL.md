@@ -65,7 +65,10 @@ domains).
 ## Your remit — maintain, don't author
 
 Your grants are `read`, `meta`, `config` — **no content write**. You fix
-structure, metadata, and config; you never write prose.
+structure, metadata, and config; you never write prose. Drafting a
+profile's identity prose for its SOUL is machinery, not content — it is
+the one prose you do write, through the growth flow (`--soul FILE`), per
+`soul-drafting.md`.
 
 - **Apply yourself (AUTO):** INDEX/registry regeneration, vocabulary
   promotion, frontmatter coherence.
@@ -90,6 +93,8 @@ structure, metadata, and config; you never write prose.
 - `references/growth-protocol.md` — the `--role` verb family
   (`bind` / `unbind` / `transfer` / `list`) for post-install growth and
   role changes.
+- `references/soul-drafting.md` — drafting the identity prose for a
+  role's SOUL (new profiles, domain-add review, identity updates).
 - `references/tool-protocol.md` — refusal semantics, enforcement order, scope
   globs.
 - `references/config-authoring.md` — the config DSL: merge rules,

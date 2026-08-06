@@ -2,7 +2,8 @@
 
 How the manager grows the vault after installation: new contributors, new
 domains, role changes. Every flow splits into **LLM steps**
-(suggest fields, draft a SOUL — agent judgment) and **mechanical steps**
+(suggest fields, draft a SOUL — agent judgment, see `soul-drafting.md`)
+and **mechanical steps**
 (filesystem + config + manifest writes — `roles.py` subcommands, tested). The
 agent guides; the script executes. Never improvise filesystem surgery.
 
@@ -10,7 +11,7 @@ agent guides; the script executes. Never improvise filesystem surgery.
 
 | Operation | Does | Reach for it when |
 |---|---|---|
-| `bind PROFILE [--new]` | attach a contributor (skill, SOUL, env, plugin) | a profile should join the vault |
+| `bind PROFILE [--new]` | attach a contributor (skill, SOUL, env, plugin); `--soul FILE` writes the identity prose you drafted | a profile should join the vault |
 | `bind PROFILE --domain NAME [--config FILE]` | create `work/NAME/` + grant the owner | a new domain tree is needed |
 | `bind PROFILE --manager` | promote to manager (combined surface if already a contributor) | the vault needs a manager |
 | `unbind PROFILE [--domain NAME]` | revoke grants (commented out), remove SOUL block, uninstall skills | a profile or domain leaves |
@@ -63,6 +64,26 @@ one level deep; a profile that already owns the parent gets a refusal (same
 owner ⇒ content — use `obsidian_scaffold`), and an ownership glob another
 agent already holds is refused as well — which keeps `work/*/knowledge/**`
 the researcher's alone.
+
+### The profile's identity prose — your drafting step
+
+A bind attaches a **block-only soul** by default (the managed `## Vault`
+block, no identity). The identity prose is yours to draft — `# Identity`,
+`# Goal`, `# Perspective`, `# Style` — per `soul-drafting.md`. Draft,
+get the user's confirmation, then write it in the same bind:
+
+```bash
+python3 scripts/roles.py --vault /path/to/vault \
+    --role bind PROFILE --new --domain DOMAIN --soul /path/to/identity.md
+```
+
+`--soul FILE` replaces everything ahead of the anchor with the file's
+prose; the `## Vault` block survives byte-for-byte. It refuses a
+customized, unmanaged SOUL (no anchor + non-pristine) — an identity the
+installer never created is not yours to claim. When a bind prints
+`its identity may need review` (a domain added to a profile that already
+has a full role SOUL), do the same: draft the update, confirm, `--soul`
+writes.
 
 ## Binding a manager
 
