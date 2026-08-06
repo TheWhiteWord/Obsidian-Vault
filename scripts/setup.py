@@ -27,9 +27,10 @@ from pathlib import Path
 
 from vault_ops import (_active_agent_names, _block_text, _create_profile,
                        _grant_role, _revoke_globs, _role_skill,
-                       enable_plugin_for_profile, ensure_soul_sections,
-                       install_cron_jobs, install_skills, profile_home,
-                       scaffold_vault, seed_profile_config)
+                       _soul_identity, enable_plugin_for_profile,
+                       ensure_soul_sections, install_cron_jobs,
+                       install_skills, profile_home, scaffold_vault,
+                       seed_profile_config)
 
 # --- setup stage machine (P6 redesign, 2026-08-05) -------------------------
 
@@ -224,6 +225,7 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
     for prof, roles in sorted(profiles.items()):
         skill_role = _role_skill(roles)
         is_default = prof == "default"
+        created = False
         if dry_run:
             out.append(f"[dry-run] profile {prof}: skill={skill_role} "
                        f"roles={sorted(roles)}")
@@ -232,10 +234,18 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
                 desc = "; ".join(ROLE_META[r]["desc"] for r in roles
                                  if r in ROLE_META) or "Vault profile"
                 _create_profile(prof, desc)
+                created = True
             pskills = profile_home(hermes_home, prof) / "skills"
             install_skills(pskills, role=skill_role)
             soul = profile_home(hermes_home, prof) / "SOUL.md"
-            ensure_soul_sections(soul, skill_role)
+            # P8.1: a full role SOUL is written only for a profile CREATED
+            # by this run (a fresh `hermes profile create` seed — zero
+            # user intent). Existing profiles (default / existing:NAME)
+            # keep their identity: block-only append. The manager maps to
+            # its own identity template (2026-08-06 review), same gate.
+            identity = _soul_identity(roles) if created else ""
+            ensure_soul_sections(soul, skill_role,
+                                 profile_name=prof, identity=identity)
             seed_profile_config(hermes_home, prof)
             enable_plugin_for_profile(hermes_home, prof, vault_root)
         out.append(f"profile {prof}: {skill_role} "

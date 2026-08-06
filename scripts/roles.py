@@ -56,6 +56,10 @@ def main() -> int:
     ap.add_argument("--config", metavar="FILE",
                     help="(bind --domain/--system) prepared .vault/config.yaml "
                          "(default: minimal stub)")
+    ap.add_argument("--soul", metavar="FILE", dest="soul_file",
+                    help="(bind) identity prose file (manager-drafted, "
+                         "user-confirmed) written as the profile SOUL's "
+                         "identity — supersedes the shipped templates")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print actions without performing them")
     args = ap.parse_args()
@@ -76,7 +80,8 @@ def main() -> int:
         role_bind(hermes_home, vault_root, args.profile,
                   new=args.new, manager_role=args.manager,
                   domain=args.domain or "", config_file=args.config or "",
-                  system_tree=args.system, dry_run=args.dry_run)
+                  system_tree=args.system, soul_file=args.soul_file or "",
+                  dry_run=args.dry_run)
     elif args.role == "unbind":
         if not args.profile:
             ap.error("--role unbind requires PROFILE")
