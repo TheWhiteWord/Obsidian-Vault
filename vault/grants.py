@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 from .constants import CONFIG_DIRNAME, ROLES_FILENAME
+from .ownership import owner_of
 from .paths import VaultPathError
 
 logger = logging.getLogger(__name__)
@@ -192,6 +193,20 @@ class RoleRegistry:
         grants = self.get(agent)
         required = OPERATION_GRANTS[operation]
 
+        # P7 shadowing (spec 07 §2.2–2.3): inside an owned scope,
+        # write/config/append resolve only for the derived owner. A
+        # capability glob held by a non-owner grants nothing there. read
+        # and meta stay generous (the parent owner's meta backstop, the
+        # manager's meta over ** — untouched).
+        if required in ("write", "config") or operation in APPEND_ALLOWS:
+            owner = owner_of(self._write_globs, rel_path)
+            if owner is not None and owner != agent:
+                raise PermissionDenied(
+                    f"{agent} may not {operation} at {rel_path!r}: "
+                    f"the scope is owned by {owner} (write/config resolve "
+                    f"only for the derived owner)"
+                )
+
         if grants.matches(required, rel_path):
             return
 
@@ -221,6 +236,15 @@ class RoleRegistry:
         """
         grants = self.get(agent)
         return [p for p in paths if grants.matches("read", p)]
+
+    @property
+    def _write_globs(self) -> Dict[str, List[str]]:
+        """Agent → write globs: the ownership resolver's input.
+
+        Only write globs can establish ownership (spec 07 §2.2). Computed on
+        demand — vaults are small and this is a per-call scan.
+        """
+        return {name: g.globs("write") for name, g in self.agents.items()}
 
     def any_grant(self, agent: str, rel_path: str) -> bool:
         """True if the agent holds *any* grant kind over ``rel_path``.

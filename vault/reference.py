@@ -54,8 +54,9 @@ CONFIG_OPTIONS: List[Dict[str, str]] = [
         "default": "false",
         "meaning": (
             "The field is mandatory for every note in the folder: a write "
-            "missing it is refused with suggestions. Children accumulate — "
-            "a required field can never be dropped down the tree."
+            "missing it is refused with suggestions. Nearest declaration "
+            "wins — a child may add a requirement or drop an inherited one "
+            "(P7 relax)."
         ),
     },
     {

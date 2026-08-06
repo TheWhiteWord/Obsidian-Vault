@@ -237,6 +237,24 @@ def _derive_issue_key(subject: str, target: str) -> str:
     return f"{slug}|{target}|{digest}"
 
 
+def _handle_conventions(args, **kw) -> str:
+    def run(a, vault_root, agent, roles):
+        from vault import conventions
+        from vault.paths import safe_join
+
+        if a.get("path") or "content" in a:
+            if not (a.get("path") and "content" in a):
+                return {"ok": False, "error": "bad_request",
+                        "message": "edit mode needs both 'path' and 'content'"}
+            return conventions.write_conventions(
+                vault_root, agent, roles,
+                path=a["path"], content=a["content"])
+        folder = a.get("folder", ".")
+        target = safe_join(vault_root, folder)
+        return conventions.resolved_conventions(vault_root, target)
+    return _dispatch(run, args, needs_roles=True)
+
+
 def _handle_issue(args, **kw) -> str:
     def run(a, vault_root, agent, roles):
         from vault import issues
@@ -390,6 +408,8 @@ def register(ctx) -> None:
         "obsidian_scaffold":      (schemas.OBSIDIAN_SCAFFOLD, _handle_scaffold, "🌱"),
         "obsidian_edit_config":   (schemas.OBSIDIAN_EDIT_CONFIG,
                                    _handle_edit_config, "⚙️"),
+        "obsidian_conventions":   (schemas.OBSIDIAN_CONVENTIONS,
+                                   _handle_conventions, "🧭"),
         "obsidian_index":         (schemas.OBSIDIAN_INDEX, _handle_index, "📑"),
         "obsidian_audit":         (schemas.OBSIDIAN_AUDIT, _handle_audit, "📜"),
         "obsidian_reference":     (schemas.OBSIDIAN_REFERENCE, _handle_reference, "📖"),

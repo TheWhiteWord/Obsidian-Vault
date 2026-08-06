@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from .config import ResolvedConfig, resolve_config
 from .constants import TODAY_TOKEN, VOCABULARY_FLAG
+from .conventions import nearest_conventions
 from .grants import GRANT_KINDS, RoleRegistry
 from .notes import Note, derive_tags, derive_vocabulary, iter_notes
 from .paths import relative_to_vault, safe_join
@@ -173,6 +174,12 @@ def build_context(
     if agent is not None and roles is not None:
         rel = relative_to_vault(vault_root, target)
         payload["grants"] = _grants_row(roles, agent, rel)
+
+    # P7 §4.3: a one-line pointer to the nearest conventions file — the
+    # chain content itself comes from obsidian_conventions on demand.
+    conventions = nearest_conventions(vault_root, target)
+    if conventions is not None:
+        payload["conventions"] = str(conventions.relative_to(vault_root))
 
     if len(notes) > max_siblings:
         payload["siblings_truncated"] = len(notes) - max_siblings

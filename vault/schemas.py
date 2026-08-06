@@ -439,8 +439,8 @@ OBSIDIAN_EDIT_CONFIG: Dict[str, Any] = {
         "`config` grant over the target — a domain owner "
         "holds it on its own tree (D-5); root config and roles.yaml stay "
         "manager-only. Never edits roles.yaml. Edits that would break the "
-        "uniformity contract (dropping an inherited required field, "
-        "redefining format/multi) are refused."
+        "uniformity contract (redefining format/multi) are refused — "
+        "dropping an inherited required is legal since P7 (nearest wins)."
         + _CONVENTIONS_REMINDER
     ),
     "parameters": {
@@ -466,6 +466,39 @@ OBSIDIAN_EDIT_CONFIG: Dict[str, Any] = {
 }
 
 
+OBSIDIAN_CONVENTIONS: Dict[str, Any] = {
+    "name": "obsidian_conventions",
+    "description": (
+        "Read or edit the vault's per-scope conventions — the writing "
+        "directives that live in-tree at <scope>/.vault/conventions.md. "
+        "Nearest scope wins; absent rules fall back up the chain. Read "
+        "mode (pass a folder): returns the resolved chain — nearest file "
+        "plus every fallback, with content. Edit mode (pass a path ending "
+        "in .vault/conventions.md plus content): only the derived owner of "
+        "the scope may write — the manager never writes conventions. "
+        "Conventions are policy prose, not notes: no frontmatter "
+        "validation, no INDEX regeneration, invisible to search."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "folder": {"type": "string",
+                       "description": "Read mode: vault-relative folder "
+                                      "whose resolved conventions chain to "
+                                      "return."},
+            "path": {"type": "string",
+                     "description": "Edit mode: vault-relative path to a "
+                                    ".vault/conventions.md file."},
+            "content": {"type": "string",
+                        "description": "Edit mode: the new file content."},
+            "agent": _AGENT_ARG,
+            "vault": _VAULT_ARG,
+        },
+        "required": [],
+    },
+}
+
+
 ALL_SCHEMAS: List[Dict[str, Any]] = [
     OBSIDIAN_CONTEXT,
     OBSIDIAN_WRITE,
@@ -473,6 +506,7 @@ ALL_SCHEMAS: List[Dict[str, Any]] = [
     OBSIDIAN_DELETE,
     OBSIDIAN_SCAFFOLD,
     OBSIDIAN_EDIT_CONFIG,
+    OBSIDIAN_CONVENTIONS,
     OBSIDIAN_INDEX,
     OBSIDIAN_AUDIT,
     OBSIDIAN_REFERENCE,

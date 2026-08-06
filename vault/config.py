@@ -12,7 +12,7 @@ Key                          Behaviour
 ``fields.*.allowed``         union — child extends parent vocabulary
 ``fields.*.allowed_only``    replace — child restricts (explicit opt-in)
 ``defaults``                 child overrides key-by-key
-``fields.*.required``        union — child may add, never drop
+``fields.*.required``        nearest declaration wins — a child may add or drop (P7 relax)
 ``tags.mode``                child overrides wholly
 ===========================  ==========================================
 
@@ -123,13 +123,10 @@ def _merge_field(
             merged["allowed"] = list(value)
             merged["restricted"] = True
         elif key == "required":
-            # union semantics: a child may add a requirement, never drop one
-            if parent.get("required") and not value:
-                raise ConfigError(
-                    f"{source}: field '{name}' cannot drop an inherited "
-                    f"'required: true'. Requirements only accumulate."
-                )
-            merged["required"] = bool(value) or bool(parent.get("required"))
+            # P7 relax (spec 07 §5): nearest declaration wins — a child may
+            # now drop an inherited requirement (relax) or add one. Parent
+            # scopes are unaffected (the merge is per-scope).
+            merged["required"] = bool(value)
         else:
             merged[key] = value
 

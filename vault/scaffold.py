@@ -237,9 +237,9 @@ def _validate_merged_chain(root: Path, target: Path, merged: Dict[str, Any]) -> 
     """Re-resolve the config chain with ``merged`` in place of ``target``.
 
     Runs the real loader over the whole chain, so the uniformity contract
-    (dropped inherited ``required``, redefined ``format``/``multi``) raises
-    ``ConfigError`` before anything is written — the edit is refused, not
-    applied-then-broken.
+    (redefined ``format``/``multi``) raises ``ConfigError`` before anything
+    is written — the edit is refused, not applied-then-broken. Dropping an
+    inherited ``required`` is legal since P7 (nearest declaration wins).
     """
     import yaml
 
@@ -274,8 +274,9 @@ def edit_config(
 
     Refusals: ``roles.yaml`` (grants are never edited by tools), non-config
     targets, missing files (scaffold creates those), and any edit that
-    breaks the uniformity contract — dropping an inherited ``required`` or
-    redefining ``format``/``multi`` is refused via the real loader.
+    breaks the uniformity contract — redefining ``format``/``multi`` is
+    refused via the real loader (dropping an inherited ``required`` is legal
+    since P7: nearest declaration wins).
     """
     import yaml
 
