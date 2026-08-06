@@ -11,6 +11,7 @@ these tests double as a check that the bundle ships what the installer needs.
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -349,6 +350,113 @@ def test_enable_plugin_surfaces_failure(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "WARNING" in out
     assert "boom" in out
+
+
+# --- install_cron_jobs -----------------------------------------------------
+
+def _fake_run_recorder(calls, list_stdout=""):
+    """A subprocess.run fake recording commands; list returns list_stdout."""
+    import subprocess
+    def fake_run(cmd, **kw):
+        calls.append(list(cmd))
+        if cmd[-2:] == ["cron", "list"]:
+            return subprocess.CompletedProcess(cmd, 0, list_stdout, "")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    return fake_run
+
+
+def _is_create(cmd):
+    """Whether a recorded command is a `cron create` (works with and
+    without a --profile scope prefix)."""
+    return any(cmd[i:i + 2] == ["cron", "create"]
+               for i in range(len(cmd) - 1))
+
+
+def _create_schedule(cmd):
+    """The positional schedule right after `cron create`."""
+    i = next(i for i in range(len(cmd) - 1)
+             if cmd[i:i + 2] == ["cron", "create"])
+    return cmd[i + 2]
+
+
+def test_install_cron_jobs_creates_both_on_named_profile(monkeypatch):
+    """Named manager profile: `--profile` scoped create with the two jobs,
+    deliver=local, and the manager skill pinned."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=""))
+
+    lines = installer.install_cron_jobs("vault-manager")
+
+    creates = [c for c in calls if _is_create(c)]
+    assert len(creates) == 2
+    assert {_create_schedule(c) for c in creates} == {"0 5 * * *", "0 6 * * 1"}
+    for cmd in creates:
+        assert cmd[0] == "hermes" and cmd[1:3] == ["--profile", "vault-manager"]
+        assert cmd[cmd.index("--deliver") + 1] == "local"
+        assert cmd[cmd.index("--skill") + 1] == "obsidian-vault-management"
+        assert "--name" in cmd
+    assert all("created on vault-manager" in l for l in lines)
+
+
+def test_install_cron_jobs_default_uses_bare_command(monkeypatch):
+    """One-agent installs: the manager role on `default` → bare hermes cron
+    (no --profile), mirroring enable_plugin_for_profile."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=""))
+
+    installer.install_cron_jobs("default")
+
+    creates = [c for c in calls if _is_create(c)]
+    assert len(creates) == 2
+    for cmd in creates:
+        assert cmd[0] == "hermes"
+        assert "--profile" not in cmd
+
+
+def test_install_cron_jobs_skips_existing_by_name(monkeypatch):
+    """Idempotency: a job whose name already exists is left untouched; the
+    other is still created."""
+    calls = []
+    monkeypatch.setattr(
+        subprocess, "run",
+        _fake_run_recorder(
+            calls, list_stdout="    Name:      vault-maintain-daily\n"))
+
+    lines = installer.install_cron_jobs("vault-manager")
+
+    creates = [c for c in calls if _is_create(c)]
+    assert len(creates) == 1
+    assert _create_schedule(creates[0]) == "0 6 * * 1"  # optimize only
+    assert any("vault-maintain-daily already exists" in l for l in lines)
+
+
+def test_install_cron_jobs_dry_run_never_shells(monkeypatch):
+    """--dry-run reports the creates without touching the CLI."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls))
+
+    lines = installer.install_cron_jobs("vault-manager", dry_run=True)
+
+    assert calls == []
+    assert len(lines) == 2 and all("[dry-run]" in l for l in lines)
+
+
+def test_install_cron_jobs_create_failure_warns(monkeypatch):
+    """A failing cron create is a visible WARNING recap line, not a crash."""
+    import subprocess
+    def fake_run(cmd, **kw):
+        if cmd[-2:] == ["cron", "list"]:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.CompletedProcess(cmd, 1, "", "boom")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    lines = installer.install_cron_jobs("vault-manager")
+
+    assert len(lines) == 2
+    assert all("WARNING" in l and "boom" in l for l in lines)
 
 
 # --- _create_profile -------------------------------------------------------

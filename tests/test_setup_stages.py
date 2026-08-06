@@ -254,11 +254,13 @@ class TestRunSetup:
         """The whole questionnaire against a scratch home, one-agent setup:
         every role on the default profile → combined + grants unioned."""
         vault = scratch_home / "vault"
-        # fake profile creation + plugin enable (real CLI is out of scope)
+        # fake profile creation + plugin enable + cron (real CLI out of scope)
         monkeypatch.setattr(installer, "_create_profile",
                             lambda name, desc: None)
         monkeypatch.setattr(installer, "enable_plugin_for_profile",
                             lambda home, name, vault_root: None)
+        monkeypatch.setattr(installer, "install_cron_jobs",
+                            lambda profile, dry_run=False: [])
         answers = [str(vault), "TWW", "standard",
                    "default",  # manager → default
                    "default",  # creative → default
