@@ -755,8 +755,10 @@ overwrite" precedent the replace rule mirrors).
   the CrewAI craft guide in `reference/Crafting_Effective_Agents_-_CrewAI.md`):
   `# Identity` → `# Goal` → `# Perspective` → `# Style`, each 2–4 lines.
   Perspective's FORM follows the role's psychology (scars / external
-  judge / duty / stewardship) — never a fixed skeleton. **`manager`
-  still pre-enrichment** (Identity+Style only) — enrichment pending.
+  judge / duty / stewardship / invisible success) — never a fixed
+  skeleton. All five enriched; the manager's Perspective is the
+  invisible-success paradox (its role IS vault health, the one
+  vault-connected identity).
 - ☑ Identities are **decoupled personas** (review, 2026-08-06): the agent
   IS the persona; the vault is a tool/memory layer expressed by the
   anchored block. The manager is the deliberate exception (its identity
