@@ -158,9 +158,10 @@ restatement · **C** `format`/`multi` immutable · **D** P7 before coder-plugin.
      fire per the new model, no manifest remnants)
    - Fresh-machine E2E final run: **ALL PASS**. **Suite 349 green.**
 
-10. **P7.9 — Commit prep** — layered commits (engine → scripts → installer →
-    presets → docs), working tree clean, suite count in the tracker. Davide
-    pushes via VS Code.
+10. **P7.9 — Commit prep** — **DONE** — layered commits on `main`:
+    specs (913175f) → engine (bc36c19) → tests (160db7d) → scripts
+    (f9e5b3a) → presets+skills (7c0ea24). Working tree clean. Suite 349.
+    **P7 SHIPPED 2026-08-06** — Davide pushes via VS Code.
 
 ## Invariants enforced
 
