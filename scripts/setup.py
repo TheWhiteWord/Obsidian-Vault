@@ -25,7 +25,8 @@ import os
 import sys
 from pathlib import Path
 
-from vault_ops import (_create_profile, _grant_role, _role_skill,
+from vault_ops import (_active_agent_names, _block_text, _create_profile,
+                       _grant_role, _revoke_globs, _role_skill,
                        enable_plugin_for_profile, ensure_soul_sections,
                        install_skills, profile_home, scaffold_vault,
                        seed_profile_config)
@@ -249,6 +250,23 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
                     continue
                 if _grant_role(roles_path, prof, role, dry_run=dry_run):
                     out.append(f"roles.yaml: {prof} ← {role}")
+        # P7: unassigned preset agents must not linger. A preset agent no
+        # profile maps to (one-agent installs: creative/dev/researcher left
+        # active) would hold grants the assignment never meant to give —
+        # and under ownership rules a leftover owning the same domain as
+        # the assignee makes every write there ambiguous. Comment out.
+        import re as _re
+        mapped = set(assignments) | {"default"}
+        for name in _active_agent_names(roles_path):
+            if name in mapped:
+                continue
+            block = _block_text(roles_path, name)
+            pairs = [(m.group(1), _re.findall(r'"([^"]+)"', m.group(2)))
+                     for m in _re.finditer(
+                         r"(?m)^    ([a-zA-Z0-9_-]+):\s*\[(.*?)\]", block)]
+            if pairs and _revoke_globs(roles_path, name, pairs,
+                                       dry_run=dry_run):
+                out.append(f"roles.yaml: {name} commented out (unassigned)")
 
     if not dry_run:
         _save_setup_state(hermes_home, {"stage": 0, "answers": {}})

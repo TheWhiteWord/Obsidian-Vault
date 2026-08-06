@@ -99,16 +99,11 @@ def _soul_block(role: str) -> str:
     }
     conventions = (
         "### Convention maintenance\n"
-        "- Maintained conventions live in "
-        "`conventions/<vault>-conventions.md`; create/edit when a user "
-        "preference about writing rules lands; register below.\n"
-    )
-    manifest = (
-        "### Convention manifest\n"
-        "<!-- maintained by the growth protocol; one line per convention "
-        "file -->\n"
-        "<!-- add: - `conventions/<vault>-conventions.md` — description "
-        "(domain) -->\n"
+        "- Vault conventions live in-tree as `.vault/conventions.md` — one "
+        "at the root, optionally per scope; the file nearest a folder "
+        "governs it. Create/edit the governing file when a user preference "
+        "about writing rules lands (read via `obsidian_conventions`; "
+        "writes are scope-gated).\n"
     )
 
     if role == "manager":
@@ -130,7 +125,6 @@ def _soul_block(role: str) -> str:
         f"{ops[role]}"
         f"{issues[role]}"
         f"{conventions}"
-        f"{manifest}"
     )
 
 # --- composition (pure) ---------------------------------------------------
@@ -491,6 +485,9 @@ def scaffold_vault(vault_root: Path, preset: str,
             src = STARTER / rel
             if src.is_file():
                 _copy_if_missing(src, vault_root / rel)
+    # P7: the root conventions file — seeded once from the template, grows
+    # through interaction; never a preset artifact.
+    ensure_root_conventions(vault_root)
     return created
 
 
@@ -511,14 +508,23 @@ def _role_grants(role: str) -> list[tuple[str, list[str]]]:
     if role == "creative":
         return [("write", ["work/creative/**"]),
                 ("config", ["work/creative/**"]),
+                ("meta", ["work/creative/**"]),      # the backstop grant (P7)
                 ("read", ["work/creative/**", "work/*/knowledge/**"])]
     if role == "dev":
         return [("write", ["work/coding/**"]),
                 ("config", ["work/coding/**"]),
+                ("meta", ["work/coding/**"]),        # the backstop grant (P7)
                 ("read", ["work/coding/**", "work/*/knowledge/**"])]
     if role == "researcher":
-        return [("write", ["work/*/knowledge/**"]),
-                ("config", ["work/*/knowledge/**"]),
+        # Literal subdomain globs (P7, spec 07 §3.2): knowledge folders are
+        # OWNED — the wildcard write glob is a capability and never owns.
+        # The wildcard survives as read-only (research reads every domain).
+        return [("write", ["work/creative/knowledge/**",
+                           "work/coding/knowledge/**"]),
+                ("config", ["work/creative/knowledge/**",
+                            "work/coding/knowledge/**"]),
+                ("meta", ["work/creative/knowledge/**",
+                          "work/coding/knowledge/**"]),
                 ("read", ["work/*/knowledge/**", "system/**"])]
     return []
 
@@ -590,9 +596,13 @@ def _ensure_agent_block(roles_path: Path, profile: str,
         break
     changed = False
     inserts: list[tuple[int, str]] = []
+    block_end = end  # frozen scan bound — `end` below is the RUNNING insert
+    # position and must not grow the range a later kind scans (two missing
+    # kinds in a row used to walk past the line list — IndexError; meta in
+    # the role grant sets exposed it).
     for kind, globs in needed:
         found = None
-        for i in range(start, end):
+        for i in range(start, block_end):
             km = _re.match(rf"^    {_re.escape(kind)}:\s*\[(.*?)\]\s*$",
                            lines[i].strip("\n"))
             if km:
@@ -680,34 +690,22 @@ def _create_profile(name: str, description: str) -> None:
 
 # --- growth protocol (P5c) ------------------------------------------------
 
-def vault_conventions_name(vault_root: Path) -> str:
-    """Name of the maintained conventions file: ``<vault>-conventions.md``.
+def ensure_root_conventions(vault_root: Path, dry_run: bool = False) -> Path:
+    """Seed the vault's root conventions file (P7 §4.2).
 
-    One per profile per vault (06-growth-design §2.1): the one file in the
-    contributor skill's conventions/ that grows through interaction — never
-    seeded, never touched by the installer. Subdomains share it unless their
-    rulesets genuinely diverge — the split is a documented LLM step, not a
-    mechanical branch.
+    ``.vault/conventions.md`` from ``templates/vault-conventions.md``, with
+    the vault name substituted. Copy-if-missing — never overwrites an
+    existing file: it grows through interaction (the installer's survival
+    guarantee). Per-scope files are the manager's to create via
+    ``obsidian_conventions``; the installer only seeds the root.
     """
-    return f"{vault_root.name}-conventions.md"
-
-
-def ensure_conventions_file(profile_skills: Path, vault_root: Path,
-                            dry_run: bool = False) -> Path:
-    """Copy-if-missing the maintained conventions file into a profile.
-
-    ``conventions/<vault>-conventions.md`` from ``templates/vault-conventions.md``,
-    with the vault name substituted. Never overwrites an existing file (it
-    grows through interaction — the installer's survival guarantee).
-    """
-    conv_dir = profile_skills / "note-taking" / "obsidian-vault" / "conventions"
-    dst = conv_dir / vault_conventions_name(vault_root)
+    dst = vault_root / ".vault" / "conventions.md"
     if dst.exists():
         return dst
     if dry_run:
         print(f"[dry-run] create {dst} from template")
         return dst
-    conv_dir.mkdir(parents=True, exist_ok=True)
+    dst.parent.mkdir(parents=True, exist_ok=True)
     text = (BUNDLED_SKILL / "templates" / "vault-conventions.md"
             ).read_text(encoding="utf-8")
     text = text.replace("<Vault name>", vault_root.name)
@@ -715,54 +713,75 @@ def ensure_conventions_file(profile_skills: Path, vault_root: Path,
     return dst
 
 
-def append_manifest_entry(soul_path: Path, line: str,
-                          dry_run: bool = False) -> bool:
-    """Append one convention-manifest line to a SOUL's Convention manifest.
+def _validate_domain_bind(roles_path: Path, profile: str, domain: str) -> None:
+    """Refuse a ``bind --domain`` that is malformed, content, or a duplicate (P7).
 
-    Inserts the line immediately before the ``<!-- add:`` marker (the
-    manifest's directed placeholder), so real entries accumulate above it.
-    Idempotent: an exact line already present → no change, False. Refuses
-    when the SOUL has no add-marker — that is a manager SOUL (conventions
-    are contributor-maintained), so this is the right guard.
+    Shape: a domain (``creative``) or a one-level subdomain path
+    (``creative/knowledge``); deeper paths are content, not ownership
+    boundaries. A subdomain bind is refused when the profile already owns
+    the parent (same owner ⇒ content — use ``obsidian_scaffold``) and when
+    the ownership glob is already held by another agent (a subdomain needs
+    a single owner). Raises before any write — the caller runs this before
+    creating anything.
     """
-    if not soul_path.is_file():
-        raise FileNotFoundError(
-            f"SOUL not found: {soul_path} — install the skill for that "
-            f"profile first (--add-contributor / the installer)")
-    text = soul_path.read_text(encoding="utf-8")
-    if line in text:
-        return False
-    marker = "<!-- add:"
-    idx = text.find(marker)
-    if idx == -1:
+    from vault.grants import load_roles
+    from vault.ownership import duplicate_ownership_globs
+
+    parts = [p for p in domain.strip("/").split("/") if p]
+    if not 1 <= len(parts) <= 2 or any(
+            any(c in p for c in "*?[") for p in parts):
         raise ValueError(
-            f"{soul_path}: no convention-manifest add-marker — a manager "
-            f"SOUL? Conventions are contributor-maintained.")
-    if dry_run:
-        print(f"[dry-run] manifest entry: {line}")
-        return True
-    soul_path.write_text(text[:idx] + line + "\n" + text[idx:],
-                         encoding="utf-8")
-    return True
+            "--domain must be a domain or a one-level subdomain path "
+            f"(e.g. 'creative' or 'creative/knowledge'), got {domain!r}")
+    if len(parts) == 1:
+        return
+
+    parent, sub = parts
+    roles = load_roles(roles_path.parent.parent)
+    if roles.allows(profile, "edit", f"work/{parent}/.placeholder"):
+        raise ValueError(
+            f"{profile} already owns work/{parent}/ — a subfolder with the "
+            f"same owner is content, not a subdomain; use obsidian_scaffold "
+            f"instead of --domain")
+    new_glob = f"work/{parent}/{sub}/**"
+    others = {name: g.globs("write")
+              for name, g in roles.agents.items() if name != profile}
+    conflicts = duplicate_ownership_globs({**others, profile: [new_glob]})
+    if conflicts:
+        raise ValueError(
+            f"refusing --domain {domain}: {conflicts[0]} — a subdomain "
+            f"needs a single owner")
 
 
 def _append_agent_grant(roles_path: Path, owner: str, domain: str,
                         dry_run: bool = False) -> bool:
     """Ensure an owner's grant block covers ``work/<domain>/**``.
 
-    Thin wrapper over :func:`_ensure_agent_block` (the one grant
-    mechanism). Existing owners are EXTENDED, not refused — role
-    accumulation is first-class since P6; the old "refuse existing
-    owner" path is gone. Idempotent: owner + globs already present →
-    False, no change.
+    ``domain`` is a slashed path: ``creative`` (domain) or
+    ``creative/knowledge`` (subdomain, P7). A domain bind grants
+    write/config/meta on the tree + the shared-knowledge read; a subdomain
+    bind grants write/config/meta on the subdomain + read over the PARENT
+    (N-4 — the parent owner's meta backstop already covers it). Validation
+    happens in role_bind before any write.
     """
     if not roles_path.is_file():
         raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
-    needed = [
-        ("write", [f"work/{domain}/**"]),
-        ("config", [f"work/{domain}/**"]),
-        ("read", [f"work/{domain}/**", "work/*/knowledge/**"]),
-    ]
+    parts = [p for p in domain.strip("/").split("/") if p]
+    if len(parts) == 1:
+        needed = [
+            ("write", [f"work/{domain}/**"]),
+            ("config", [f"work/{domain}/**"]),
+            ("meta", [f"work/{domain}/**"]),      # the backstop grant (P7)
+            ("read", [f"work/{domain}/**", "work/*/knowledge/**"]),
+        ]
+    else:
+        parent = parts[0]
+        needed = [
+            ("write", [f"work/{domain}/**"]),
+            ("config", [f"work/{domain}/**"]),
+            ("meta", [f"work/{domain}/**"]),
+            ("read", [f"work/{parent}/**"]),      # read over the parent (N-4)
+        ]
     return _ensure_agent_block(roles_path, owner, needed,
                                dry_run=dry_run, label=domain)
 
@@ -870,14 +889,24 @@ def _block_text(roles_path: Path, profile: str) -> str:
         return ""
 
 
+def _is_manager_block(block: str) -> bool:
+    """True when a grant block holds the ROOT meta glob ``\"**\"``.
+
+    Since P7 a combined profile's meta line is ``[\"work/<d>/**\", \"**\"]``
+    (the domain backstop) — the manager is the agent whose meta list
+    contains the root glob, not one holding only it.
+    """
+    import re as _re
+    return bool(_re.search(r'^    meta:\s*\[[^\]]*"\*\*"', block, _re.M))
+
+
 def _manager_profile(roles_path: Path) -> str | None:
-    """The profile holding the active manager block (meta: ["**"])."""
+    """The profile holding the active manager block (meta: [\"**\"])."""
     import re as _re
     if not roles_path.is_file():
         return None
     for name in _active_agent_names(roles_path):
-        if _re.search(r"^    meta:\s*\[\"\*\*\"\]",
-                      _block_text(roles_path, name), _re.M):
+        if _is_manager_block(_block_text(roles_path, name)):
             return name
     return None
 
@@ -889,7 +918,7 @@ def _roles_from_grants(roles_path: Path, profile: str) -> set[str]:
     if not block:
         return set()
     roles: set[str] = set()
-    if _re.search(r"^    meta:\s*\[\"\*\*\"\]", block, _re.M):
+    if _is_manager_block(block):
         roles.add("manager")
     if _re.search(r"^    (write|append):", block, _re.M):
         roles.add("contributor")
@@ -1018,11 +1047,12 @@ def uninstall_skills(profile_skills: Path, vault_root: Path) -> None:
     """Remove a profile's vault skill overlay + this vault's conventions file.
 
     Symlink surfaces (SKILL.md, references/, templates/) are unlinked for
-    both role skills; real copy-on-write content is preserved; the
-    maintained conventions file for THIS vault is removed; empty dirs are
-    pruned up the chain.
+    both role skills; real copy-on-write content is preserved; empty dirs
+    are pruned up the chain. (The vault's conventions file is in-tree
+    since P7 — never a profile artifact.)
     """
-    conv_name = vault_conventions_name(vault_root)
+    # conventions moved in-tree (P7) — the vault's .vault/conventions.md is
+    # the vault's, never unlinked with a profile
     for name in ("obsidian-vault", "obsidian-vault-management"):
         target = profile_skills / "note-taking" / name
         if not target.is_dir():
@@ -1031,9 +1061,8 @@ def uninstall_skills(profile_skills: Path, vault_root: Path) -> None:
             link = target / sub
             if link.is_symlink():
                 link.unlink()
-        conv_file = target / "conventions" / conv_name
-        if conv_file.is_file():
-            conv_file.unlink()
+        # install_skills creates an EMPTY conventions/ dir (P5c); prune it
+        # when empty. Real content there is copy-on-write — preserved.
         conv_dir = target / "conventions"
         if conv_dir.is_dir() and not any(conv_dir.iterdir()):
             conv_dir.rmdir()
@@ -1058,33 +1087,6 @@ def remove_profile_env(prof_home: Path) -> bool:
         return False
     env_path.write_text(after, encoding="utf-8")
     return True
-
-
-def remove_manifest_entries(soul_path: Path, pattern: str,
-                            dry_run: bool = False) -> int:
-    """Remove convention-manifest lines matching a regex (unown --domain).
-
-    Lines above the ``<!-- add:`` marker matching ``pattern`` are deleted;
-    the marker and all other SOUL content are preserved. Returns count.
-    """
-    import re as _re
-    if not soul_path.is_file():
-        return 0
-    text = soul_path.read_text(encoding="utf-8")
-    idx = text.find("<!-- add:")
-    if idx == -1:
-        return 0
-    head, tail = text[:idx], text[idx:]
-    kept = [ln for ln in head.splitlines(keepends=True)
-            if not _re.search(pattern, ln)]
-    removed = len(head.splitlines()) - len(kept)
-    if not removed:
-        return 0
-    if dry_run:
-        print(f"[dry-run] manifest − {removed} entry/entries")
-        return removed
-    soul_path.write_text("".join(kept) + tail, encoding="utf-8")
-    return removed
 
 
 def _surface_for_roles(hermes_home: Path, profile: str, roles: set[str],
@@ -1146,6 +1148,9 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
             raise ValueError(
                 f"{profile} is the manager — managers hold no content "
                 f"grants; bind a contributor profile instead")
+        # P7: refuse before any write — shape, content-not-subdomain, and
+        # duplicate-ownership violations must not create a directory first.
+        _validate_domain_bind(roles_path, profile, domain)
         domain_dir = vault_root / "work" / domain
         if not domain_dir.is_dir() and not dry_run:
             (domain_dir / ".vault").mkdir(parents=True, exist_ok=True)
@@ -1163,8 +1168,6 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         if dry_run:
             print(f"[dry-run] mkdir {domain_dir} + .vault/config.yaml")
         _append_agent_grant(roles_path, profile, domain, dry_run=dry_run)
-        if not dry_run:
-            ensure_conventions_file(prof_home / "skills", vault_root)
     # surface aligned to the (now) live grants — combined when the profile
     # already held content grants and is now also the manager
     existing = _roles_from_grants(roles_path, profile)
@@ -1175,15 +1178,6 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         ensure_soul_sections(prof_home / "SOUL.md", skill_role)
         seed_profile_config(hermes_home, profile)
         enable_plugin_for_profile(hermes_home, profile, vault_root)
-    if domain:
-        # after the surface: the manifest entry needs the add-marker the
-        # SOUL block provides (fresh binds have none before this point)
-        line = (f"- `conventions/{vault_conventions_name(vault_root)}` — "
-                f"{domain} domain conventions (work/{domain}/**)")
-        if dry_run:
-            print(f"[dry-run] manifest entry: {line}")
-        else:
-            append_manifest_entry(prof_home / "SOUL.md", line)
     print(f"bound {profile}: {skill_role}"
           + (f" + domain work/{domain}/**" if domain else ""))
 
@@ -1195,11 +1189,10 @@ def role_unbind(hermes_home: Path, vault_root: Path, profile: str,
     Without ``--domain``: full unbind — grant block commented out, SOUL
     ``## Vault`` block removed, skill overlay uninstalled, vault env vars
     dropped; notice that owned domain trees remain. With ``--domain``:
-    unown just that domain (globs revoked, manifest entry removed, tree
-    kept). Refuses: unbinding the manager (a vault must keep a manager —
-    use ``transfer``); a domain unown on the manager.
+    unown just that domain (globs revoked, tree kept). Refuses: unbinding
+    the manager (a vault must keep a manager — use ``transfer``); a domain
+    unown on the manager.
     """
-    import re as _re
     roles_path = vault_root / ".vault" / "roles.yaml"
     if not roles_path.is_file():
         raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
@@ -1214,10 +1207,19 @@ def role_unbind(hermes_home: Path, vault_root: Path, profile: str,
             raise ValueError(
                 f"{profile} holds no grants under work/{domain}/")
         _revoke_globs(roles_path, profile, pairs, dry_run=dry_run)
-        if not dry_run:
-            remove_manifest_entries(
-                prof_home / "SOUL.md",
-                rf"\(work/{_re.escape(domain)}/\*\*\)")
+        # P7: a subdomain bind also granted read over the parent — revoke
+        # it when no other subdomain under the same parent remains (a
+        # remaining write glob there, e.g. the parent itself, keeps it).
+        parts = [p for p in domain.strip("/").split("/") if p]
+        if len(parts) == 2:
+            remaining_write = [
+                g for kind, globs in _domain_owned_globs(
+                    roles_path, profile, parts[0])
+                for g in globs if kind == "write"]
+            if not remaining_write:
+                _revoke_globs(roles_path, profile,
+                              [("read", [f"work/{parts[0]}/**"])],
+                              dry_run=dry_run)
         print(f"domain work/{domain}/**: unowned from {profile}\n"
               "  notice: the tree remains — remove it manually if wanted")
         return
@@ -1257,10 +1259,8 @@ def role_transfer(hermes_home: Path, vault_root: Path, profile: str,
     its surface is refreshed (combined when B already holds content
     grants); A is re-derived from its remaining grants (contributor
     surface, or full unbind when nothing remains). With ``--domain``:
-    domain ownership moves A → B (B must be a bound contributor; the
-    manifest entry moves too).
+    domain ownership moves A → B (B must be a bound contributor).
     """
-    import re as _re
     roles_path = vault_root / ".vault" / "roles.yaml"
     if not roles_path.is_file():
         raise FileNotFoundError(f"roles.yaml not found: {roles_path}")
@@ -1281,13 +1281,6 @@ def role_transfer(hermes_home: Path, vault_root: Path, profile: str,
                 f"{profile} holds no grants under work/{domain}/")
         _revoke_globs(roles_path, profile, pairs, dry_run=dry_run)
         _append_agent_grant(roles_path, to, domain, dry_run=dry_run)
-        if not dry_run:
-            remove_manifest_entries(
-                profile_home(hermes_home, profile) / "SOUL.md",
-                rf"\(work/{_re.escape(domain)}/\*\*\)")
-        line = (f"- `conventions/{vault_conventions_name(vault_root)}` — "
-                f"{domain} domain conventions (work/{domain}/**)")
-        append_manifest_entry(target_home / "SOUL.md", line, dry_run=dry_run)
         print(f"domain work/{domain}/**: {profile} → {to}")
         return
     if _manager_profile(roles_path) != profile:

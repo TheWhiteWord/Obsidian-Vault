@@ -8,9 +8,9 @@ the live roles.yaml block; unbind comments the block out (deny-by-default,
 re-bindable) and removes the SOUL block; the vault must always keep a
 manager (transfer hands it off).
 
-    python3 scripts/roles.py --vault <path> --role bind PROFILE [--new] [--manager] [--domain NAME] [--config FILE]
-    python3 scripts/roles.py --vault <path> --role unbind PROFILE [--domain NAME]
-    python3 scripts/roles.py --vault <path> --role transfer PROFILE --to SUCCESSOR [--domain NAME]
+    python3 scripts/roles.py --vault <path> --role bind PROFILE [--new] [--manager] [--domain PATH] [--config FILE]
+    python3 scripts/roles.py --vault <path> --role unbind PROFILE [--domain PATH]
+    python3 scripts/roles.py --vault <path> --role transfer PROFILE --to SUCCESSOR [--domain PATH]
     python3 scripts/roles.py --vault <path> --role list
 Environment:
     HERMES_HOME   override the Hermes home (default: ~/.hermes).
@@ -44,8 +44,10 @@ def main() -> int:
     ap.add_argument("--manager", action="store_true",
                     help="(bind) bind as manager (mutually exclusive with "
                          "--domain \u2014 managers hold no content grants)")
-    ap.add_argument("--domain", metavar="NAME",
-                    help="(bind/unbind/transfer) operate on work/<NAME>/**")
+    ap.add_argument("--domain", metavar="PATH",
+                    help="(bind/unbind/transfer) operate on work/<PATH>/** — "
+                         "a domain ('creative') or a one-level subdomain "
+                         "path ('creative/knowledge')")
     ap.add_argument("--config", metavar="FILE",
                     help="(bind --domain) prepared .vault/config.yaml "
                          "(default: minimal stub)")
