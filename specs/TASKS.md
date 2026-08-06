@@ -740,6 +740,46 @@ procedure (`references/recurring-tasks.md`), not engine machinery.
 - ☑ Live vault: stale dev-time jobs recreated with the new prompts
   (2026-08-06, ids rotated; verified via `cron list` + jobs.json).
 
+### P8.1 — Full role SOULs ☑ (2026-08-06)
+*Proves: role profiles ship real identities, not just a vault block.*
+Design: `specs/08-soul-design.md`; research: `reference/soul-md-research.md`
+(source-verified against `hermes_cli/default_soul.py` — the "safe to
+overwrite" precedent the replace rule mirrors).
+
+- ☑ Five identity templates in `souls/` (repo root — moved out of
+  `examples/` 2026-08-06: profile templates shared across presets, not
+  vault content) — `manager`, `system-owner`, `creative`, `researcher`,
+  `dev` (prose-only files; the engine composes the `## Vault` block so
+  it cannot drift).
+- ☑ Templates enriched to the four-section house style (2026-08-06, per
+  the CrewAI craft guide in `reference/Crafting_Effective_Agents_-_CrewAI.md`):
+  `# Identity` → `# Goal` → `# Perspective` → `# Style`, each 2–4 lines.
+  Perspective's FORM follows the role's psychology (scars / external
+  judge / duty / stewardship) — never a fixed skeleton. **`manager`
+  still pre-enrichment** (Identity+Style only) — enrichment pending.
+- ☑ Identities are **decoupled personas** (review, 2026-08-06): the agent
+  IS the persona; the vault is a tool/memory layer expressed by the
+  anchored block. The manager is the deliberate exception (its identity
+  is vault-connected).
+- ☑ Replace-vs-append rule: pristine (`DEFAULT_SOUL_MD` / legacy
+  template) → replace wholesale with the full role SOUL; anything else →
+  append/replace only the anchored block. `default` is always block-only
+  (S-3). Manager gets a full soul only on a profile CREATED for the role
+  (S-4, review override).
+- ☑ `_is_pristine_soul`, `_full_soul`, `_soul_identity`, `_soul_has_identity`,
+  `_apply_soul_prose`; `--soul FILE` on `bind` (generation + update path);
+  domain-add review notice (S-8).
+- ☑ Tests: 21 new (381 green) — pristine→replace, customized→append,
+  legacy→replace, default carve-out, manager full soul, combined
+  block-only, upgrade paths, idempotence, unbind restore (incl. manager),
+  `--soul` semantics, review notice.
+- ☑ E2E probe updated (90 checks): standard + blank manager assert full
+  manager souls; contributors assert decoupled full souls; `default`
+  block-only.
+- ☑ Live vault: `vault-manager` + contributors migrated to full souls via
+  the installer's own functions; `default` untouched byte-for-byte
+  (probe 10/10).
+
 ### P6 — Coder-plugin interaction ☐
 *Deferred (2026-08-04): a specific feature needing its own research and
 design, and a lot of background work (Davide).* Prerequisites to resolve
