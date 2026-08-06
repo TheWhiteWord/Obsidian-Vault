@@ -640,3 +640,9 @@ def test_starter_roles_globs_reach_domain_paths(tmp_path):
                             "work/creative/knowledge/kant.md")
     assert roles.allows("researcher", "read", "system/handbook/design.md")
     assert not roles.allows("researcher", "create", "work/creative/projects/idea.md")
+    # P7.5: the root conventions file is a system document like README.md —
+    # the system owner (default) edits it; contributors and the manager
+    # read it only (writes are grant-gated).
+    assert roles.allows("default", "edit", ".vault/conventions.md")
+    assert not roles.allows("creative", "edit", ".vault/conventions.md")
+    assert not roles.allows("vault-manager", "edit", ".vault/conventions.md")

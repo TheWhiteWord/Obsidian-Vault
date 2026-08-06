@@ -100,10 +100,10 @@ def _soul_block(role: str) -> str:
     conventions = (
         "### Convention maintenance\n"
         "- Vault conventions live in-tree as `.vault/conventions.md` — one "
-        "at the root, optionally per scope; the file nearest a folder "
-        "governs it. Create/edit the governing file when a user preference "
-        "about writing rules lands (read via `obsidian_conventions`; "
-        "writes are scope-gated).\n"
+        "at the root (the system owner's), optionally per scope (the owning "
+        "agent's); the file nearest a folder governs it. Edit the governing "
+        "file when a user preference about writing rules lands (read via "
+        "`obsidian_conventions`; writes are grant-gated).\n"
     )
 
     if role == "manager":
@@ -696,8 +696,10 @@ def ensure_root_conventions(vault_root: Path, dry_run: bool = False) -> Path:
     ``.vault/conventions.md`` from ``templates/vault-conventions.md``, with
     the vault name substituted. Copy-if-missing — never overwrites an
     existing file: it grows through interaction (the installer's survival
-    guarantee). Per-scope files are the manager's to create via
-    ``obsidian_conventions``; the installer only seeds the root.
+    guarantee). Per-scope files are the scope owner's to create via
+    ``obsidian_conventions``; the installer only seeds the root. The root
+    file is the system owner's document (``default`` holds a write glob for
+    it, like ``README.md``); the manager never writes conventions.
     """
     dst = vault_root / ".vault" / "conventions.md"
     if dst.exists():

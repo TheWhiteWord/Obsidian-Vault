@@ -21,7 +21,7 @@ agents:
   # Also holds the vault-root README.md — the orientation doc is a system
   # document, so the manager's README-drift findings have an owner.
   default:
-    write:  ["system/**", "README.md"]
+    write:  ["system/**", "README.md", ".vault/conventions.md"]
     read:   ["**"]
 
   # Manager — maintenance only. Structurally incapable of altering prose:
