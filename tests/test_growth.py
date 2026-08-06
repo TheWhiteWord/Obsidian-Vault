@@ -539,6 +539,155 @@ def test_remove_soul_sections_removes_block_keeps_rest(tmp_path):
     assert installer.remove_soul_sections(soul) is False  # idempotent
 
 
+def test_remove_soul_sections_full_soul_restores_default(tmp_path):
+    """P8.1: unbinding a profile whose full soul is engine-written (prose
+    matches a shipped template) restores DEFAULT_SOUL_MD — the pre-bind
+    seed — rather than leaving a stale identity behind."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "creative")
+    soul = profile / "SOUL.md"
+    # The helper seeds "# SOUL\n" (customized) — restore the pristine
+    # Hermes seed so the full-soul replace path fires.
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    installer.ensure_soul_sections(soul, "contributor",
+                                   profile_name="creative",
+                                   identity="creative")
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity")
+    assert installer.SOUL_ANCHOR in text
+
+    assert installer.remove_soul_sections(soul) is True
+    rest = soul.read_text(encoding="utf-8")
+    assert rest == installer.DEFAULT_SOUL_MD
+    assert installer.SOUL_ANCHOR not in rest
+    assert "# Identity" not in rest
+
+
+def test_remove_soul_sections_full_soul_user_edited_prose_kept(tmp_path):
+    """P8.1: once the user edits the identity prose, unbind removes only
+    the vault block — the edited identity survives (never destroyed)."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "dev")
+    soul = profile / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    installer.ensure_soul_sections(soul, "contributor",
+                                   profile_name="dev", identity="dev")
+    edited = soul.read_text(encoding="utf-8").replace(
+        "You are the developer — you build software that works",
+        "You are the developer — you build software that works, "
+        "and I work on games.")
+    soul.write_text(edited, encoding="utf-8")
+
+    assert installer.remove_soul_sections(soul) is True
+    rest = soul.read_text(encoding="utf-8")
+    assert "and I work on games" in rest
+    assert installer.SOUL_ANCHOR not in rest
+
+
+def test_remove_soul_sections_manager_full_soul_restores_default(tmp_path):
+    """P8.1 review: unbinding an engine-written manager full soul restores
+    DEFAULT_SOUL_MD, like any other full soul."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "vault-manager")
+    soul = profile / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    installer.ensure_soul_sections(soul, "manager",
+                                   profile_name="vault-manager",
+                                   identity="manager")
+    assert soul.read_text(encoding="utf-8").startswith("# Identity")
+    assert installer.remove_soul_sections(soul) is True
+    assert soul.read_text(encoding="utf-8") == installer.DEFAULT_SOUL_MD
+
+
+# --- --soul FILE (P8.1 review: note c) ------------------------------------
+
+def test_apply_soul_prose_replaces_identity_keeps_block(tmp_path):
+    """--soul FILE replaces the identity prose ahead of the anchor; the
+    managed block (and anything after it) survives byte-for-byte."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "creative")
+    soul = profile / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    installer.ensure_soul_sections(soul, "contributor",
+                                   profile_name="creative",
+                                   identity="creative")
+    block_tail = soul.read_text(encoding="utf-8").split(
+        installer.SOUL_ANCHOR, 1)[1]
+
+    prose = tmp_path / "new-identity.md"
+    prose.write_text("# Identity\nI now also cover recipes.\n", encoding="utf-8")
+    assert installer._apply_soul_prose(soul, str(prose), "contributor") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity\nI now also cover recipes.")
+    assert installer.SOUL_ANCHOR in text
+    assert text.split(installer.SOUL_ANCHOR, 1)[1] == block_tail
+
+
+def test_apply_soul_prose_on_pristine_writes_full(tmp_path):
+    """--soul FILE on a fresh/pristine profile writes prose + block."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "bob")
+    soul = profile / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    prose = tmp_path / "bob-soul.md"
+    prose.write_text("# Identity\nYou are the recipes keeper.\n", encoding="utf-8")
+    assert installer._apply_soul_prose(soul, str(prose), "contributor") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity\nYou are the recipes keeper.")
+    assert installer.SOUL_ANCHOR in text
+
+
+def test_apply_soul_prose_refuses_customized_unmanaged(tmp_path):
+    """--soul FILE refuses a customized SOUL with no managed block — never
+    claims an identity the installer did not create."""
+    hermes, vault = _scratch(tmp_path)
+    profile = _profile_dir(hermes, "bob")
+    soul = profile / "SOUL.md"
+    soul.write_text("# My custom soul\n", encoding="utf-8")
+    prose = tmp_path / "bob-soul.md"
+    prose.write_text("# Identity\nprose\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        installer._apply_soul_prose(soul, str(prose), "contributor")
+
+
+def test_bind_domain_notice_on_full_soul_profile(tmp_path, capsys):
+    """Note c: binding a domain to a profile that already has identity
+    prose ahead of the block (full role soul OR user-customised) prints a
+    review notice; a pristine block-only profile does not."""
+    hermes, vault = _scratch(tmp_path)
+    # A profile with a full soul (pristine seed first).
+    profile = _profile_dir(hermes, "creative")
+    soul = profile / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    installer.ensure_soul_sections(soul, "contributor",
+                                   profile_name="creative",
+                                   identity="creative")
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    out = capsys.readouterr().out
+    assert "full role SOUL" in out
+    assert "bind --soul FILE" in out
+
+    # A user-customised soul (no template identity) also gets the notice —
+    # its identity may need review after the domain add.
+    capsys.readouterr()
+    _profile_dir(hermes, "dev")
+    (hermes / "profiles" / "dev" / "SOUL.md").write_text(
+        "# My Own Soul\nI am custom.\n", encoding="utf-8")
+    installer.role_bind(hermes, vault, "dev", domain="coding")
+    out = capsys.readouterr().out
+    assert "full role SOUL" in out
+
+    # A pristine block-only profile (DEFAULT seed + block, no identity)
+    # gets no notice — nothing to review.
+    capsys.readouterr()
+    _profile_dir(hermes, "researcher")
+    (hermes / "profiles" / "researcher" / "SOUL.md").write_text(
+        installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    installer.role_bind(hermes, vault, "researcher", domain="knowledge")
+    out = capsys.readouterr().out
+    assert "full role SOUL" not in out
+
+
 # --- role_unbind -----------------------------------------------------------
 
 def test_unbind_full_revokes_and_cleans(tmp_path):

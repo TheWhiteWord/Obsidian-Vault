@@ -584,6 +584,197 @@ def test_soul_sections_creates_missing_soul(tmp_path):
     assert soul.is_file()
 
 
+# --- full role SOULs (P8.1) ------------------------------------------------
+
+def test_soul_full_creative_replaces_pristine(tmp_path):
+    """A fresh Hermes seed (DEFAULT_SOUL_MD, zero user intent) is replaced
+    wholesale by the full role SOUL: identity prose + the managed block."""
+    soul = tmp_path / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="creative",
+        identity="creative") is True
+    text = soul.read_text(encoding="utf-8")
+    # Identity prose up front, vault block intact at the end.
+    assert text.startswith("# Identity")
+    assert "creative partner" in text
+    assert installer.SOUL_ANCHOR in text
+    assert "## Vault\n" in text
+    assert "### Convention maintenance" in text
+    assert installer.DEFAULT_SOUL_MD not in text
+
+
+def test_soul_full_legacy_template_replaced(tmp_path):
+    """Legacy comment-only scaffolds (Hermes' own upgrade class) are also
+    zero-intent → replaced by the full role SOUL."""
+    soul = tmp_path / "SOUL.md"
+    soul.write_text(installer._LEGACY_TEMPLATE_SOULS[0], encoding="utf-8")
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="dev", identity="dev") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity")
+    assert "developer" in text
+    assert "Hermes Agent Persona" not in text
+
+
+def test_soul_full_default_carveout_block_only(tmp_path):
+    """S-3: `default` never gets a full soul — even pristine, even with an
+    identity passed. Block-only always."""
+    soul = tmp_path / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="default",
+        identity="creative") is True
+    text = soul.read_text(encoding="utf-8")
+    assert "# Identity" not in text
+    assert installer.DEFAULT_SOUL_MD in text  # seed kept
+    assert installer.SOUL_ANCHOR in text
+
+
+def test_soul_full_manager_gets_full_soul(tmp_path):
+    """P8.1 review: the manager HAS a full soul (its identity is the one
+    directly connected to the vault). Manager prose + manager block."""
+    soul = tmp_path / "SOUL.md"
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    assert installer.ensure_soul_sections(
+        soul, "manager", profile_name="vault-manager",
+        identity="manager") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity")
+    assert "vault manager" in text
+    assert installer.SOUL_ANCHOR in text
+    assert "obsidian_maintain" in text  # the manager block
+    # The manager block has no conventions section (not a contributor).
+    assert "### Convention maintenance" not in text
+
+
+def test_soul_full_manager_ignores_contributor_identity(tmp_path):
+    """A contributor identity on the manager role is ignored (manager has
+    its own identity template)."""
+    soul = tmp_path / "SOUL.md"
+    assert installer.ensure_soul_sections(
+        soul, "manager", profile_name="vault-manager",
+        identity="creative") is True
+    text = soul.read_text(encoding="utf-8")
+    assert "# Identity" not in text
+    assert "obsidian_maintain" in text  # the manager block
+
+
+def test_soul_full_combined_ignores_identity(tmp_path):
+    """S-4: combined (one-agent) has no single identity — block only."""
+    soul = tmp_path / "SOUL.md"
+    assert installer.ensure_soul_sections(
+        soul, "combined", profile_name="assistant",
+        identity="creative") is True
+    text = soul.read_text(encoding="utf-8")
+    assert "# Identity" not in text
+    assert "Dual role" in text  # dedicated combined block
+
+
+def test_soul_full_customized_soul_appends_block(tmp_path):
+    """A user-customized SOUL never gets replaced — the vault block is
+    appended, identity prose is not written."""
+    custom = "# My Soul\nI am the user's own agent.\n"
+    soul = tmp_path / "SOUL.md"
+    soul.write_text(custom, encoding="utf-8")
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="creative",
+        identity="creative") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# My Soul")
+    assert "I am the user's own agent." in text
+    assert "# Identity" not in text  # never claimed
+    assert installer.SOUL_ANCHOR in text
+
+
+def test_soul_full_upgrades_default_plus_block(tmp_path):
+    """A profile bound before P8.1 has DEFAULT + block (engine-written on
+    a pristine seed). A later identity-bearing run upgrades it to the
+    full soul — the prefix before the anchor is still pristine."""
+    soul = tmp_path / "SOUL.md"
+    # Real pre-P8.1 state: `hermes profile create` seeded DEFAULT, the
+    # old installer appended the block.
+    soul.write_text(installer.DEFAULT_SOUL_MD, encoding="utf-8")
+    assert installer.ensure_soul_sections(soul, "contributor") is True
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="researcher",
+        identity="researcher") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity")
+    assert "researcher" in text
+    assert installer.SOUL_ANCHOR in text
+
+
+def test_soul_full_upgrades_block_only_file(tmp_path):
+    """A profile bound when no SOUL existed has only the engine's block
+    (empty prefix — still zero user intent). Identity-bearing run
+    upgrades it to the full soul."""
+    soul = tmp_path / "SOUL.md"
+    assert installer.ensure_soul_sections(soul, "contributor") is True
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="dev", identity="dev") is True
+    text = soul.read_text(encoding="utf-8")
+    assert text.startswith("# Identity")
+    assert "developer" in text
+    assert installer.SOUL_ANCHOR in text
+
+
+def test_soul_full_rerun_preserves_prose(tmp_path):
+    """Re-running with the same identity refreshes only the block; the
+    identity prose survives byte-for-byte."""
+    soul = tmp_path / "SOUL.md"
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="creative",
+        identity="creative") is True
+    first = soul.read_text(encoding="utf-8")
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="creative",
+        identity="creative") is False  # idempotent
+    assert soul.read_text(encoding="utf-8") == first
+
+
+def test_soul_full_unknown_identity_falls_back_to_block(tmp_path):
+    """An identity with no shipped template (e.g. a custom domain before
+    --soul lands) falls back to block-only — never a broken full soul."""
+    soul = tmp_path / "SOUL.md"
+    assert installer.ensure_soul_sections(
+        soul, "contributor", profile_name="bob",
+        identity="recipes") is True
+    text = soul.read_text(encoding="utf-8")
+    assert "# Identity" not in text
+    assert installer.SOUL_ANCHOR in text
+
+
+def test_soul_templates_ship_identity_and_style():
+    """Every shipped template: identity + style prose, NO anchor — the
+    engine composes the block, so it cannot drift from _soul_block."""
+    for identity in installer.SOUL_IDENTITIES:
+        prose = installer._soul_template(identity)
+        assert prose, f"template missing for {identity}"
+        assert prose.startswith("# Identity")
+        assert "# Style" in prose
+        assert installer.SOUL_ANCHOR not in prose
+
+
+def test_soul_identity_mapping():
+    assert installer._soul_identity({"manager"}) == "manager"
+    assert installer._soul_identity({"creative"}) == "creative"
+    assert installer._soul_identity({"dev"}) == "dev"
+    assert installer._soul_identity({"researcher"}) == "researcher"
+    # No identity: system-only, blank contributor, multi-role.
+    assert installer._soul_identity({"system"}) == ""
+    assert installer._soul_identity({"manager", "creative"}) == ""
+    assert installer._soul_identity({"dev", "researcher"}) == ""
+
+
+def test_is_pristine_soul():
+    assert installer._is_pristine_soul(installer.DEFAULT_SOUL_MD)
+    assert installer._is_pristine_soul(installer._LEGACY_TEMPLATE_SOULS[0])
+    assert installer._is_pristine_soul(installer._LEGACY_TEMPLATE_SOULS[1])
+    assert not installer._is_pristine_soul("# My Soul\ncustom\n")
+    assert not installer._is_pristine_soul("")
+
+
 # --- scaffold_vault --------------------------------------------------------
 
 def test_scaffold_standard_creates_tree(tmp_path):
