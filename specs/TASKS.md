@@ -785,6 +785,29 @@ overwrite" precedent the replace rule mirrors).
   the installer's own functions; `default` untouched byte-for-byte
   (probe 10/10).
 
+### P9 — Inter-agent protocol ◐ (2026-08-07)
+*Proves: profiles can ask each other for work through a native, discoverable
+protocol — no third party in the middle.*
+Design: `specs/09-inter-agent-protocol.md`; tracker: `TASKS-inter-agent.md`.
+Mechanism is Hermes-native (`hermes -p <profile> -z "…"` via the terminal
+tool); the plugin adds a static protocol file (grammar + transport, whole-file
+variant templates) and a vault protocol registry (`.state/protocols/`,
+structured records, parties-only write).
+
+- ☑ Engine: `vault/protocols.py` — record schema, slug, list/get/register/
+  update, parties gate, audit rows (`protocol_register` / `protocol_update`),
+  propose-then-confirm.
+- ☑ Tools: `obsidian_protocol_list` + `obsidian_protocol` (read/register/
+  update), schemas + registration + `plugin.yaml` + entrypoint test.
+- ☑ Canonical protocol file: `bundles/transports/native.md` (grammar +
+  transport; the whole-file variant the installer will symlink later).
+- ☑ Tests: 29 new (425 green) — validation, adversarial parties-gate matrix,
+  party-filtered list, no-pollution, tool surface.
+- ☐ Installer/skill wiring, setup transport question, kanban variant, registry
+  seeding — deferred (spec A-9; design keeps the seam).
+- ☐ Phase 4 integration checks — mutations/growth verbs vs the registry,
+  reference-file drift, READMEs (tracker).
+
 ### P6 — Coder-plugin interaction ☐
 *Deferred (2026-08-04): a specific feature needing its own research and
 design, and a lot of background work (Davide).* Prerequisites to resolve
