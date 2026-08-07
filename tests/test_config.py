@@ -1,4 +1,4 @@
-"""Config inheritance — spec §3.2, §3.3, §3.6."""
+"""Config inheritance."""
 
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ class TestUniformityContract:
             resolve_config(vault, vault / "CREATIVE/BAD")
 
     def test_child_can_drop_inherited_required(self, vault):
-        """P7 relax (spec 07 §5): nearest declaration wins — a child scope
+        """P7 relax: nearest declaration wins — a child scope
         may drop an inherited requirement; the parent scope is unaffected."""
         lax = vault / "CREATIVE/LAX/.vault/config.yaml"
         lax.parent.mkdir(parents=True)

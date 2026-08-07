@@ -1,4 +1,4 @@
-"""Derived ownership from canonical ownership globs — spec 07 §2.2 (P7).
+"""Derived ownership from canonical ownership globs (P7).
 
 **Mechanism only.** Ownership is a *derived* property of the live
 ``roles.yaml``: a path's owner is the agent holding the most-specific

@@ -1,4 +1,4 @@
-"""Generated artifacts and scaffolding — spec §6, §10."""
+"""Generated artifacts and scaffolding."""
 
 from __future__ import annotations
 

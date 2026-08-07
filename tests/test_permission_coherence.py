@@ -57,7 +57,7 @@ def roles(vault_with_roles):
 class TestIssuesChannelRestricted:
     """D6 #3 — `allowed` unioned with root; the channel must restrict.
 
-    P7 (spec 07 §2.3): the channel is inside SYSTEM (owned by `system`), so
+    P7: the channel is inside SYSTEM (owned by `system`), so
     the cross-tree writer (tww) is shadowed — the owner writes it.
     """
 

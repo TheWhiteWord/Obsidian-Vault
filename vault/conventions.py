@@ -1,4 +1,4 @@
-"""Per-scope conventions — the in-tree scope directives (spec 07 §4, P7).
+"""Per-scope conventions — the in-tree scope directives (P7).
 
 **Mechanism only.** A conventions file may sit at any depth:
 ``<scope>/.vault/conventions.md``. Discovery mirrors config (walk up from
@@ -80,7 +80,7 @@ def resolved_conventions(vault_root: Path, target: Path) -> Dict[str, Any]:
 
 def fingerprint(text: str) -> str:
     """Short content fingerprint — the declined-by-convention dedupe key
-    (spec 07 §6.4): a suggestion declined because conventions cover it is
+    : a suggestion declined because conventions cover it is
     re-suggested only when the fingerprint changes."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
@@ -92,7 +92,7 @@ def write_conventions(
     path: str,
     content: str,
 ) -> Dict[str, Any]:
-    """Write a conventions file (spec 07 §4.5).
+    """Write a conventions file.
 
     Gated on ``write`` over the containing scope: ``roles.check(agent,
     "edit", rel)`` enforces the grant AND P7 shadowing — the derived owner

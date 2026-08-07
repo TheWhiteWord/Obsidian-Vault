@@ -1,4 +1,4 @@
-"""Maintenance sweep tests — spec 05 §3–§5.
+"""Maintenance sweep tests.
 
 Covers: the delta pass (checkpoint over the audit log), the B1 census, B2
 suggestions, distribution (findings → ledger issues, dedupe by key),

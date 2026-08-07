@@ -1,4 +1,4 @@
-"""Vault maintenance sweep — spec 05 §3–§5.
+"""Vault maintenance sweep — see docs/guides/maintenance.md.
 
 One tool, three depths — the cron schedule drives the mode:
 
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 #: mutate the ledger, not notes — they are never part of the change set.
 NOTE_ACTIONS = ("create", "edit", "edit_meta", "delete", "scaffold")
 
-#: Suggestions auto-decline after this many days of non-action (spec 05 §5.2).
+#: Suggestions auto-decline after this many days of non-action.
 SUGGESTION_TTL_DAYS = 14
 
 #: Closed records older than this are pruned (same value as issues.PRUNE_TTL_DAYS).

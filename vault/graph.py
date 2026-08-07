@@ -1,4 +1,4 @@
-"""Wikilink graph — spec §3 / Principle 1.
+"""Wikilink graph — derived on demand (Principle 1).
 
 The graph is *derived*, not stored as a source of truth. It is computed from
 note bodies on demand, so it cannot drift from reality (there is no cached copy

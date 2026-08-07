@@ -1,6 +1,6 @@
 """``obsidian_context`` — the one call an agent makes before writing.
 
-Spec §5. Returns the merged schema for a folder, its derived tag vocabulary,
+Returns the merged schema for a folder, its derived tag vocabulary,
 sibling notes for linking, and a ready-to-fill template. Everything needed to
 write a conforming note *in this folder*, and nothing about any other folder.
 """
@@ -118,7 +118,7 @@ def build_context(
     if not target.exists():
         return {
             "error": f"folder does not exist: {folder}",
-            "hint": "use obsidian_scaffold to create it (spec §10)",
+            "hint": "use obsidian_scaffold to create it",
         }
 
     cfg = resolve_config(vault_root, target)

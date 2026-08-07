@@ -1,6 +1,6 @@
 """Config loading and inheritance resolution.
 
-Implements spec 01-vault-v2-model.md §3.3.
+Implements the config inheritance model (see docs/concepts/model.md).
 
 A ``.vault/config.yaml`` may sit at any depth. The effective config for a
 folder is the merge of every config from the vault root down to that folder,
@@ -123,7 +123,7 @@ def _merge_field(
             merged["allowed"] = list(value)
             merged["restricted"] = True
         elif key == "required":
-            # P7 relax (spec 07 §5): nearest declaration wins — a child may
+            # P7 relax: nearest declaration wins — a child may
             # now drop an inherited requirement (relax) or add one. Parent
             # scopes are unaffected (the merge is per-scope).
             merged["required"] = bool(value)

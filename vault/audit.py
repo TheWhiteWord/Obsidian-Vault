@@ -1,4 +1,4 @@
-"""Audit trail — spec §6.
+"""Audit trail — see docs/concepts/model.md.
 
 Append-only JSONL. Every mutation the plugin performs is recorded with who,
 what, where, and when.

@@ -1,4 +1,4 @@
-"""Protocol registry tests — spec 09.
+"""Protocol registry tests.
 
 The registry is machinery under the state dir: structured records with
 parties, not notes. These tests cover validation, the parties-only write

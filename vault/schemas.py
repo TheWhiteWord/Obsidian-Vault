@@ -1,7 +1,7 @@
 """Tool schemas — the agent-facing surface.
 
 Kept apart from dispatch so the entrypoint stays a thin wiring layer, and so
-the surface can be reviewed as a whole (spec `02-tool-surface.md`).
+the surface can be reviewed as a whole.
 """
 
 from __future__ import annotations

@@ -164,7 +164,7 @@ def test_ensure_manager_grant_noop_on_starter(tmp_path):
     assert scaffolded.read_text(encoding="utf-8") == text
 
 
-# --- P7: subdomain bind/unbind (nested ownership, spec 07 §3.1) ------------
+# --- P7: subdomain bind/unbind (nested ownership) ------------
 
 def test_append_agent_grant_subdomain_shape(tmp_path):
     """P7 N-4: subdomain bind = write/config/meta on the subdomain + read
@@ -322,7 +322,7 @@ def test_bind_domain_reuses_renamed_container(tmp_path):
     assert registry.allows("creative", "create", "work/recipes/note.md")
 
 
-# --- role_bind (P6, 06-growth-design §4.5) ---------------------------------
+# --- role_bind (P6) ---------------------------------
 
 def _bound_contributor(hermes: Path, vault: Path, name: str) -> Path:
     """Pre-create a profile and bind it as a bare contributor."""

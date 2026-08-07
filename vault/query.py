@@ -1,4 +1,4 @@
-"""Query — spec §2.2.1, §5.
+"""Query — the read path (see docs/concepts/grants.md).
 
 The read path. Deterministic: grep-class term matching over note titles,
 tags, and bodies. No embeddings, no BM25 — A4 defers those until grep

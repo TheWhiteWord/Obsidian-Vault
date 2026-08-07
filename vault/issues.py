@@ -1,4 +1,4 @@
-"""Issue ledger — spec 05.
+"""Issue ledger — see docs/guides/maintenance.md.
 
 Issues are *structured records with a lifecycle*, not notes. One small JSON
 file per issue under the state dir: ``<state>/issues/<slug>.json``. Current
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 #: Lifecycle states — engine-fixed, universal.
 ISSUE_STATES = ("open", "in_progress", "resolved", "declined")
 #: Distinguishes correctness findings (B1) from quality suggestions (B2);
-#: the auto-close policy treats them differently (spec 05 §5.2).
+#: the auto-close policy treats them differently.
 ISSUE_NATURES = ("finding", "suggestion")
 #: Priorities — engine-fixed.
 ISSUE_PRIORITIES = ("low", "medium", "high", "critical")
@@ -153,7 +153,7 @@ def create_issue(
 ) -> Dict[str, Any]:
     """Open an issue — or skip / re-open an existing one with the same key.
 
-    Dedupe and re-escalation are the same mechanism (spec 05 §5.2): if a
+    Dedupe and re-escalation are the same mechanism: if a
     record with this key is ``open``/``in_progress``, return ``exists``; if
     it is ``resolved``/``declined``, re-open it (history stays attached);
     otherwise create it. Every mutation is audited with ``path`` = target.
@@ -317,7 +317,7 @@ def prune_issues(
     """Delete closed records older than the TTL. Returns pruned keys.
 
     The audit trail keeps the full history, so deleting the current-state
-    file loses nothing (spec 05 §5.2).
+    file loses nothing.
     """
     d = issues_dir(vault_root)
     if d is None or not d.exists():

@@ -1,4 +1,4 @@
-"""Issue ledger tests — spec 05.
+"""Issue ledger tests.
 
 The ledger is machinery under the state dir: records, not notes. These tests
 cover the lifecycle (create / dedupe / re-escalation / resolve / prune), the

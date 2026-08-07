@@ -1,4 +1,4 @@
-"""Folder scaffolding — spec §10.
+"""Folder scaffolding — see docs/guides/growth.md.
 
 The mechanism that makes growth cheap. A new folder should cost one
 conversation and one command; if it costs more, structure gets created

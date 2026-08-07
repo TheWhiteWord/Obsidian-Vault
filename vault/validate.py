@@ -1,4 +1,4 @@
-"""Frontmatter validation — spec §3, §3.5, §3.7.
+"""Frontmatter validation — see docs/concepts/model.md.
 
 Separate from grants on purpose: *may this agent write here* and *is this note
 well-formed* are independent questions, and conflating them makes both harder

@@ -1,4 +1,4 @@
-"""P7 — in-tree per-scope conventions (spec 07 §4): discovery, the
+"""P7 — in-tree per-scope conventions: discovery, the
 `obsidian_conventions` tool surface, and the write gate."""
 
 from __future__ import annotations

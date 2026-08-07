@@ -1,4 +1,4 @@
-"""Protocol registry — spec 09.
+"""Protocol registry — see docs/guides/inter-agent.md.
 
 Handoffs are *structured records with parties*, not notes. One small YAML
 file per handoff under the state dir: ``<state>/protocols/<slug>.yaml``.
@@ -23,7 +23,7 @@ Record shape (engine-fixed, layout-independent):
       "instructions": "REQUEST SIDE — ...\\nRESPONSE SIDE — ..."
     }
 
-Access (spec 09 §3): **read** is grant-free for any registered agent (the
+Access: **read** is grant-free for any registered agent (the
 tool layer enforces identity via ``roles.get``); **write** is parties-only —
 create requires the caller to be one of the sides (self-registration),
 update requires the caller to be a party of the existing record. The engine
@@ -186,7 +186,7 @@ def list_protocols(
 ) -> Dict[str, Any]:
     """All handoffs where ``agent`` is a party, optionally narrowed by peer.
 
-    Practical visibility is party-filtered (spec 09 §3/A-6): an agent sees
+    Practical visibility is party-filtered: an agent sees
     only the handoffs it participates in by default; ``peer`` narrows to the
     handoffs between exactly these two profiles (either direction).
     """

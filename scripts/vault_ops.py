@@ -180,7 +180,7 @@ def _soul_block(role: str) -> str:
     `## Inter-agent awareness` first — the universal peer/role awareness
     every profile carries (discovery, the memory contract, transport),
     with role-aware depth for the handoff registry — then the `## Vault`
-    umbrella with lean `###` subsections (06-growth-design §3.1). Every
+    umbrella with lean `###` subsections. Every
     bullet names a tool or a reference — never prose instruction.
     Contributor and combined carry the convention sections and the
     manifest; the manifest starts empty-but-directed and the growth
@@ -403,7 +403,7 @@ def _ensure_symlink(link: Path, target: Path) -> None:
     A real file/dir at ``link`` is replaced only when its content is
     identical to ``target``'s — i.e. a stale copy from a pre-P5a install.
     A *modified* real dir is a deliberate copy-on-write escape hatch
-    (06-growth-design §2.3) and is left alone. SKILL.md is engine-owned:
+    and is left alone. SKILL.md is engine-owned:
     any real file there is a stale composed variant and is always replaced.
     """
     if link.is_symlink():
@@ -462,7 +462,7 @@ def install_skills(profile_skills: Path, role: str) -> list[Path]:
     guarantee).
 
     A profile that deliberately edited a reference or template (broke the
-    symlink into a real dir, copy-on-write — 06-growth-design §2.3) is
+    symlink into a real dir, copy-on-write) is
     preserved; only content-identical stale copies from a pre-P5a install
     are replaced by symlinks. `SKILL.md` is engine-owned: any real file
     there is a stale composed variant and is always replaced.
@@ -946,7 +946,7 @@ STARTER_TREE = [
     "work/coding/projects",
 ]
 
-#: Per-domain .vault configs (spec §3.3/§3.4/§3.6). Each domain declares its
+#: Per-domain .vault configs. Each domain declares its
 #: own vocabulary additions; the KNOWLEDGE schema is identical everywhere and
 #: is the §3.3 inheritance proving case. Copied only on first scaffold
 #: (copy-if-missing) — they are policy, like the root configs.
@@ -1046,7 +1046,7 @@ def _role_grants(role: str) -> list[tuple[str, list[str]]]:
                 ("meta", ["work/coding/**"]),        # the backstop grant (P7)
                 ("read", ["work/coding/**", "work/*/knowledge/**"])]
     if role == "researcher":
-        # Literal subdomain globs (P7, spec 07 §3.2): knowledge folders are
+        # Literal subdomain globs (P7): knowledge folders are
         # OWNED — the wildcard write glob is a capability and never owns.
         # The wildcard survives as read-only (research reads every domain).
         return [("write", ["work/creative/knowledge/**",
@@ -1430,7 +1430,7 @@ def _ensure_manager_grant(roles_path: Path, manager: str,
     return True
 
 
-# --- role mutation (P6, 06-growth-design §4.5) ------------------------------
+# --- role mutation (P6) ------------------------------
 #
 # Grants are the truth: a profile's role is derived from its live roles.yaml
 # block (active meta/config/read-`**` ⇒ manager; any write/append globs ⇒

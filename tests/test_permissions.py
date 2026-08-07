@@ -1,4 +1,4 @@
-"""Adversarial permission tests — spec §2.1.
+"""Adversarial permission tests.
 
 Every agent attempts every forbidden operation. All must be refused **by
 code**, not discouraged by prose. If any test here goes green by accident, the
@@ -91,7 +91,7 @@ class TestCaseTolerance:
 class TestAppendSemantics:
     """`append` creates; it must never edit or delete (§2.1).
 
-    P7 (spec 07 §2.3): creation inside an owned scope is the owner's — the
+    P7: creation inside an owned scope is the owner's — the
     legacy cross-tree ``*/ISSUES/**`` pattern is shadowed. Append now
     operates only where no ownership glob matches (an unowned tree), so the
     semantics tests use ``MISC/ISSUES`` (no canonical owner); the shadowing

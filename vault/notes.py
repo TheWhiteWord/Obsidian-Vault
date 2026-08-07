@@ -2,7 +2,7 @@
 
 The ``Note`` dataclass deliberately mirrors the shape Obsidian's Local REST
 API returns for a note (``path`` / ``content`` / ``frontmatter`` / ``tags``).
-Same struct from either source, so a future MCP adapter (spec §8 phase 5)
+Same struct from either source, so a future MCP adapter
 fills the same object with no second data model.
 
 Parsing is delegated to ``python-frontmatter`` rather than hand-rolled — YAML
@@ -91,7 +91,7 @@ def parse_note(abs_path: Path, vault_root: Path) -> Note:
 
     Never raises on malformed frontmatter — returns a Note with ``error`` set
     so a single bad file cannot break a whole-vault scan. The vault manager
-    picks these up as maintenance work (spec §1.3).
+    picks these up as maintenance work.
     """
     import frontmatter
 
@@ -132,7 +132,7 @@ def iter_notes(
 
     Generated files are excluded by default: an INDEX derived from the notes
     must not then be counted as one of them, or each regeneration feeds on the
-    last (spec §6).
+    last.
     """
     vault_root = vault_root.resolve()
     base = (scope or vault_root).resolve()
@@ -156,7 +156,7 @@ def _is_generated_file(path: Path) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Vocabulary derivation — spec §3.7
+# Vocabulary derivation
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -171,7 +171,7 @@ def derive_vocabulary(
     field_name: str,
     declared: Optional[List[str]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """Split a field's in-use values into declared and observed (spec §3.7).
+    """Split a field's in-use values into declared and observed.
 
     ``declared`` — value appears in a config's ``allowed`` list.
     ``observed`` — value is in use in notes but not declared anywhere.
@@ -215,7 +215,7 @@ def derive_vocabulary(
 
 
 def derive_tags(notes: Iterable[Note]) -> List[Dict[str, Any]]:
-    """Tag cloud for a scope, most-used first. Derived, never declared (spec §4)."""
+    """Tag cloud for a scope, most-used first. Derived, never declared."""
     counts: Counter = Counter()
     for note in notes:
         counts.update(note.tags)

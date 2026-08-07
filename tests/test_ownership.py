@@ -1,4 +1,4 @@
-"""P7 — derived ownership resolver + shadowing (spec 07 §2.2–2.3).
+"""P7 — derived ownership resolver + shadowing.
 
 The resolver is pure (no filesystem); shadowing is pinned through
 ``RoleRegistry.check`` so the enforcement point is covered, not just the

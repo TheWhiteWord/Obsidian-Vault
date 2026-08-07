@@ -1,7 +1,7 @@
 """Vault v2 — core library.
 
 Filesystem-first, headless-capable. No dependency on a running Obsidian.
-See DESK/specs/01-vault-v2-model.md.
+See docs/concepts/model.md.
 """
 
 from .config import ConfigError, ResolvedConfig, resolve_config

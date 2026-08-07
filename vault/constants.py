@@ -20,14 +20,14 @@ ROLES_FILENAME = "roles.yaml"
 #: `.state/`; a vault may relocate it via `paths.state`; only the concept is owned.
 STATE_DIRNAME = ".state"
 
-# -- schema mechanics (spec §3.2) -------------------------------------------
+# -- schema mechanics -------------------------------------------
 #: Keys inside a field definition a child may not change once a parent sets
 #: them — the structural half of the uniformity contract. Which *fields* exist
 #: is policy; that a field's shape is fixed vault-wide is mechanism.
 IMMUTABLE_FIELD_KEYS = ("format", "multi")
 
 #: Marks a field as carrying a controlled vocabulary with declared/observed
-#: states (spec §3.7). Set per-field in config: ``kind: { vocabulary: true }``.
+#: states. Set per-field in config: ``kind: { vocabulary: true }``.
 VOCABULARY_FLAG = "vocabulary"
 
 # -- traversal --------------------------------------------------------------
@@ -38,7 +38,7 @@ SKIP_DIRS = frozenset({".obsidian", ".vault", ".state", ".git", ".trash", "node_
 
 MARKDOWN_SUFFIX = ".md"
 
-# -- defaults (spec §3.4, §4) -----------------------------------------------
+# -- defaults -----------------------------------------------
 DEFAULT_TAG_MODE = "suggest"          # open | suggest | closed
 DEFAULT_FIELD_VALIDATION = "blocking"
 DEFAULT_TAG_VALIDATION = "advisory"
@@ -46,20 +46,20 @@ DEFAULT_TAG_VALIDATION = "advisory"
 #: Token substituted with today's date when it appears in ``defaults``.
 TODAY_TOKEN = "@today"
 
-# -- generated artifacts (spec §6) ------------------------------------------
+# -- generated artifacts ------------------------------------------
 GENERATED_MARKER = "<!-- generated: do not edit -->"
 
 #: Config key under ``paths:`` naming where machine-written state lives.
 #: The *value* is the user's choice; only the key name is fixed.
 STATE_PATH_KEY = "state"
 
-#: Sub-directory of the state dir holding the issue ledger (spec 05).
+#: Sub-directory of the state dir holding the issue ledger.
 #: Issues are *records*, not notes — engine machinery like the audit trail.
 #: The name is engine-reserved (mechanism); a vault may relocate the whole
 #: state dir via ``paths.state``, but the ledger's home within it is fixed.
 ISSUES_DIRNAME = "issues"
 
-#: Sub-directory of the state dir holding the protocol registry (spec 09).
+#: Sub-directory of the state dir holding the protocol registry.
 #: Handoffs are *structured records with parties*, not notes — engine
 #: machinery like the issue ledger. Same residency rule: fixed within the
 #: state dir, which itself may be relocated via ``paths.state``.

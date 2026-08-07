@@ -101,7 +101,7 @@ def test_fields_change_applies_with_user_confirmed(loaded):
 # --- grants (config kind) ----------------------------------------------------
 
 def test_manager_cannot_edit_owned_config(loaded):
-    """P7 (spec 07 §2.3): config resolves for the derived owner — the
+    """P7: config resolves for the derived owner — the
     manager's config ** no longer reaches inside an owned scope."""
     root, roles = loaded
     with pytest.raises(PermissionDenied, match="scope is owned by system"):
@@ -175,7 +175,7 @@ def _child_of_knowledge(root) -> str:
 
 
 def test_dropping_inherited_required_is_a_relax(loaded):
-    """P7 (spec 07 §5): a child of KNOWLEDGE may drop the inherited
+    """P7: a child of KNOWLEDGE may drop the inherited
     `source: required` — nearest declaration wins; the parent is
     unaffected."""
     root, roles = loaded

@@ -1,4 +1,4 @@
-"""Test fixtures — a synthetic vault built per spec §3.4/§3.6.
+"""Test fixtures — a synthetic vault mirroring the shipped preset shapes.
 
 Built in a tmp dir so tests never touch the real vault.
 """
@@ -44,7 +44,7 @@ fields:
   kind: { allowed: [concept, essay, poem, script] }
 """
 
-# spec §3.6 — byte-identical in both domains
+# the KNOWLEDGE config is byte-identical in both domains
 KNOWLEDGE_CONFIG = """
 fields:
   type:       { allowed_only: [knowledge] }

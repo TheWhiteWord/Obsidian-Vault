@@ -120,7 +120,7 @@ def test_stale_copy_replaced_by_symlink(tmp_path):
 
 def test_cow_reference_dir_preserved(tmp_path):
     """A modified real references/ dir is the copy-on-write escape hatch
-    (06-growth-design §2.3) — the installer leaves it alone."""
+    — the installer leaves it alone."""
     _pre_p5a_install(tmp_path)
     target = tmp_path / "note-taking" / "obsidian-vault"
     (target / "references" / "custom.md").write_text("custom", encoding="utf-8")
@@ -855,7 +855,7 @@ def test_scaffold_standard_creates_tree(tmp_path):
                 "work/coding/projects"):
         assert (root / rel).is_dir()
     # The issue layer is a ledger (records, not notes) — no note-issue
-    # folders, no ISSUES channel configs in the starter (spec 05 v4).
+    # folders, no ISSUES channel configs in the starter.
     assert not (root / "system/issues").exists()
     assert not (root / "work/creative/issues").exists()
     assert created  # non-empty
@@ -920,7 +920,7 @@ def test_scaffold_rerun_preserves_edited_roles(tmp_path):
 
 
 def test_scaffold_standard_copies_domain_configs(tmp_path):
-    """Per-domain .vault configs (spec §3.3/§3.4/§3.6) ship with the starter."""
+    """Per-domain .vault configs ship with the starter."""
     root = tmp_path / "vault"
     installer.scaffold_vault(root, "standard")
     for rel in installer.DOMAIN_CONFIGS:
@@ -985,7 +985,7 @@ def test_starter_roles_globs_reach_domain_paths(tmp_path):
 
     # default: owns the system tree, reads all. No issues-channel grants —
     # the issue layer is a ledger (records, not notes); raising requires no
-    # grant beyond registration (spec 05 v4).
+    # grant beyond registration.
     agents = _starter_roles_agents(root)
     assert path_matches(agents["default"]["write"][0],
                         "system/handbook/x.md")
@@ -1002,7 +1002,7 @@ def test_starter_roles_globs_reach_domain_paths(tmp_path):
     assert roles.allows("creative", "read", "work/coding/knowledge/rust.md")
     assert roles.allows("creative", "create", "work/creative/projects/idea.md")
     assert not roles.allows("creative", "create", "work/coding/projects/x.md")
-    # P7 shadowing (spec 07 §2.2): the wildcard write glob is capability-only
+    # P7 shadowing: the wildcard write glob is capability-only
     # — inside creative's owned scope it grants nothing. The P7.6 preset
     # restructure makes the researcher the literal owner of knowledge/
     # (enumerated globs), restoring its write there while the domain

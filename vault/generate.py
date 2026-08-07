@@ -1,4 +1,4 @@
-"""Generated artifacts — spec §6.
+"""Generated artifacts — see docs/concepts/model.md.
 
 INDEX files and the config registry are *derived*: regenerated from the vault's
 actual contents and overwritten without warning. Nothing here is ever

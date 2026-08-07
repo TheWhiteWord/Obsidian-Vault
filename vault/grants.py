@@ -1,4 +1,4 @@
-"""Grant resolution and enforcement — spec §2.1.
+"""Grant resolution and enforcement — see docs/concepts/grants.md.
 
 **Mechanism only.** The grant *kinds* are universal; which paths each agent
 holds is policy read from ``.vault/roles.yaml`` (principle 7).
@@ -198,7 +198,7 @@ class RoleRegistry:
         grants = self.get(agent)
         required = OPERATION_GRANTS[operation]
 
-        # P7 shadowing (spec 07 §2.2–2.3): inside an owned scope,
+        # P7 shadowing: inside an owned scope,
         # write/config/append resolve only for the derived owner. A
         # capability glob held by a non-owner grants nothing there. read
         # and meta stay generous (the parent owner's meta backstop, the
@@ -246,7 +246,7 @@ class RoleRegistry:
     def _write_globs(self) -> Dict[str, List[str]]:
         """Agent → write globs: the ownership resolver's input.
 
-        Only write globs can establish ownership (spec 07 §2.2). Computed on
+        Only write globs can establish ownership. Computed on
         demand — vaults are small and this is a per-call scan.
         """
         return {name: g.globs("write") for name, g in self.agents.items()}

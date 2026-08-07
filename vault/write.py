@@ -1,4 +1,4 @@
-"""Write operations — spec §2.1, §3, §3.7.
+"""Write operations — see docs/concepts/grants.md and docs/concepts/model.md.
 
 Every mutation passes through here, and every mutation is checked in the same
 order:
