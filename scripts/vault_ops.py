@@ -235,6 +235,39 @@ def _soul_block(role: str) -> str:
         "file when a user preference about writing rules lands (read via "
         "`obsidian_conventions`; writes are grant-gated).\n"
     )
+    # Inter-agent communication — universal awareness, role-aware depth.
+    # Communication is a Hermes capability (`hermes -p X -z` via the
+    # terminal tool), not a vault one; the SOUL is the carrier every
+    # profile sees regardless of skill loading. Contributors/combined hold
+    # the full protocol reference; the manager carries the essentials
+    # inline (no contributor file in the manager skill — no dangling
+    # pointer) (2026-08-07).
+    comms = {
+        "contributor": (
+            "### Inter-agent communication\n"
+            "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
+            "the terminal tool — one at a time, blocks until the peer's "
+            "final message returns.\n"
+            "- Handoff registry: `obsidian_protocol_list`, "
+            "`obsidian_protocol` — see `references/inter-agent-protocol.md`.\n"
+        ),
+        "manager": (
+            "### Inter-agent communication\n"
+            "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
+            "the terminal tool — task + intent + expected response form; "
+            "one at a time, blocks until the peer's final message returns.\n"
+            "- Handoff registry (read grant-free): `obsidian_protocol_list` "
+            "— parties update their own handoffs (growth-protocol.md).\n"
+        ),
+        "combined": (
+            "### Inter-agent communication\n"
+            "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
+            "the terminal tool — one at a time, blocks until the peer's "
+            "final message returns.\n"
+            "- Handoff registry: `obsidian_protocol_list`, "
+            "`obsidian_protocol` — see `references/inter-agent-protocol.md`.\n"
+        ),
+    }
 
     if role == "manager":
         return (
@@ -245,6 +278,7 @@ def _soul_block(role: str) -> str:
             "### Vault operations\n"
             f"{ops[role]}"
             f"{issues[role]}"
+            f"{comms[role]}"
         )
     return (
         f"{SOUL_ANCHOR}\n"
@@ -254,6 +288,7 @@ def _soul_block(role: str) -> str:
         "### Vault operations\n"
         f"{ops[role]}"
         f"{issues[role]}"
+        f"{comms[role]}"
         f"{conventions}"
     )
 

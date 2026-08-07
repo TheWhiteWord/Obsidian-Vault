@@ -47,6 +47,7 @@ issues. Do **not** load for plain file operations outside a vault.
 | Discover config options + grant kinds | `obsidian_reference` |
 | Load the conventions that govern this folder | `obsidian_conventions` |
 | Raise / list / resolve ledger issues | `obsidian_issue` · `obsidian_issue_list` · `obsidian_issue_resolve` |
+| Talk to a peer profile / maintain handoffs | `obsidian_protocol_list` · `obsidian_protocol` |
 
 ## Knowledge layout — bundled vs maintained
 
@@ -135,6 +136,10 @@ hand-create folders or configs.
   editing a config.
 - `references/issues.md` — the ledger lifecycle: raise / list / resolve,
   grant-filtered lists, TTLs. Load when raising or triaging issues.
+- `references/inter-agent-protocol.md` — how this profile talks to peer
+  profiles: request/response grammar, transport, permissions, and the
+  handoff registry. Load before asking a peer for vault work (or answering
+  one).
 
 Load only what the task calls for; never load all references up front.
 

@@ -117,6 +117,14 @@ silently break what exists.
       + `examples/blank-vault/README.md` (user-facing): unchanged — the
       inter-agent protocol is invisible to users (they ask the researcher;
       the protocol is how agents talk), so capability routing stays as is.
+- [x] **Awareness — SKILL.md + SOUL.md (Davide's question).** Communication
+      is a Hermes capability, not a vault one — awareness must not be gated
+      behind skill loading. Contributor SKILL.md: reference listed in
+      "References — load what the task needs" + tools in the routing table.
+      `_soul_block` (role-keyed → both presets): lean `### Inter-agent
+      communication` for every role — contributor/combined point at the
+      reference; manager carries the essentials inline (no dangling
+      pointer). Recorded in spec-09 §9. Tests extended (3 soul tests).
 
 ## Out of scope (explicitly NOT done this phase)
 

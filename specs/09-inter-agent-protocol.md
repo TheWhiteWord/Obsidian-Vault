@@ -255,3 +255,30 @@ to migrate; the parties-only update path already exists and is the correct
 owner. A growth-verb → registry coupling would be speculative machinery for
 a registry with no records. Revisit only if records prove sticky in
 practice.
+
+---
+
+## §9 Awareness — SKILL.md + SOUL.md (2026-08-07, Davide's question)
+
+**Communication is a Hermes capability, not a vault one.** `hermes -p
+<profile> -z "<request>"` works between any two profiles, vault or not;
+the vault only adds the handoff registry on top. Awareness must therefore
+not be gated behind loading the obsidian-vault skill.
+
+**SKILL.md (contributor)** — the reference is now listed in
+"References — load what the task needs" and the tools appear in the tool
+routing table (`obsidian_protocol_list` · `obsidian_protocol`).
+
+**SOUL.md (`_soul_block`, role-keyed → both presets automatically)** — a
+lean `### Inter-agent communication` subsection for every role:
+- contributor / combined: transport (`hermes -p <profile> -z` via the
+  terminal tool, one at a time) + registry tools + the full reference.
+- manager: the essentials **inline** (transport + task/intent/expected
+  response form + registry read) — the manager skill has no
+  `inter-agent-protocol.md`, so a file pointer would dangle. No
+  duplication: one canonical file, contributor-side.
+
+Why SOUL, not only the skill: the SOUL block is installed on every profile
+regardless of skill loading, so a manager (or a contributor doing non-vault
+work) still knows it can talk to peers. Cost: the SOUL block carries two
+short bullets more; the deep protocol stays in the contributor reference.

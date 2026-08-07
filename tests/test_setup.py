@@ -502,12 +502,18 @@ def test_soul_sections_contributor_has_lean_sections(tmp_path):
     # Convention manifest is retired (P7 — conventions are in-tree).
     assert "## Vault\n" in text
     for section in ("### Vault operations", "### Issues",
+                    "### Inter-agent communication",
                     "### Convention maintenance"):
         assert section in text
     assert "### Convention manifest" not in text
     # Lean pointers: tools/references, not prose instruction.
     assert "obsidian_issue" in text
     assert "references/issues.md" in text
+    # Communication awareness is universal (SOUL carries it regardless of
+    # skill loading); the contributor has the full protocol reference.
+    assert "obsidian_protocol_list" in text
+    assert "references/inter-agent-protocol.md" in text
+    assert "hermes -p <profile> -z" in text
     # Contributor must NOT see the sweep as its job.
     assert "obsidian_maintain" not in text
     # No role-directive files exist anymore; the manifest machinery
@@ -531,6 +537,13 @@ def test_soul_sections_manager_sees_sweep_only(tmp_path):
     assert "conventions/manager.md" not in text
     assert "### Convention manifest" not in text
     assert "<vault>-conventions.md" not in text
+    # Communication awareness is universal; the manager carries the
+    # essentials inline (no contributor-only file → no dangling pointer).
+    assert "### Inter-agent communication" in text
+    assert "hermes -p <profile> -z" in text
+    assert "task + intent + expected response form" in text
+    assert "obsidian_protocol_list" in text
+    assert "references/inter-agent-protocol.md" not in text
 
 
 def test_soul_sections_combined_dedicated_text(tmp_path):
@@ -542,6 +555,9 @@ def test_soul_sections_combined_dedicated_text(tmp_path):
     # Dedicated combined text: the dual role stated once, conventions kept.
     assert "Dual role" in text
     assert "obsidian_conventions" in text   # in-tree pointer (P7)
+    # Communication awareness is universal; combined has the full reference.
+    assert "### Inter-agent communication" in text
+    assert "references/inter-agent-protocol.md" in text
     assert "conventions/<vault>" not in text
     assert "conventions/manager.md" not in text
     assert "### Convention manifest" not in text   # retired (P7)
