@@ -511,9 +511,16 @@ def test_soul_sections_contributor_has_lean_sections(tmp_path):
     assert "references/issues.md" in text
     # Communication awareness is universal (SOUL carries it regardless of
     # skill loading); the contributor has the full protocol reference.
+    # Peer discovery comes first: how to list peers without any hardcoded
+    # profile name.
+    assert "Peer discovery" in text
+    assert "hermes profile list" in text
+    assert "--role list" in text
     assert "obsidian_protocol_list" in text
     assert "references/inter-agent-protocol.md" in text
     assert "hermes -p <profile> -z" in text
+    # No profile name is ever hardcoded in the SOUL block.
+    assert "creative" not in text and "researcher" not in text
     # Contributor must NOT see the sweep as its job.
     assert "obsidian_maintain" not in text
     # No role-directive files exist anymore; the manifest machinery
@@ -540,10 +547,15 @@ def test_soul_sections_manager_sees_sweep_only(tmp_path):
     # Communication awareness is universal; the manager carries the
     # essentials inline (no contributor-only file → no dangling pointer).
     assert "### Inter-agent communication" in text
+    assert "Peer discovery" in text
+    assert "hermes profile list" in text
+    assert "--role list" in text
     assert "hermes -p <profile> -z" in text
     assert "task + intent + expected response form" in text
     assert "obsidian_protocol_list" in text
     assert "references/inter-agent-protocol.md" not in text
+    # No profile name is ever hardcoded in the SOUL block.
+    assert "creative" not in text and "researcher" not in text
 
 
 def test_soul_sections_combined_dedicated_text(tmp_path):
@@ -557,6 +569,8 @@ def test_soul_sections_combined_dedicated_text(tmp_path):
     assert "obsidian_conventions" in text   # in-tree pointer (P7)
     # Communication awareness is universal; combined has the full reference.
     assert "### Inter-agent communication" in text
+    assert "Peer discovery" in text
+    assert "hermes profile list" in text
     assert "references/inter-agent-protocol.md" in text
     assert "conventions/<vault>" not in text
     assert "conventions/manager.md" not in text

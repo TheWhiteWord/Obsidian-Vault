@@ -241,10 +241,17 @@ def _soul_block(role: str) -> str:
     # profile sees regardless of skill loading. Contributors/combined hold
     # the full protocol reference; the manager carries the essentials
     # inline (no contributor file in the manager skill — no dangling
-    # pointer) (2026-08-07).
+    # pointer). Discovery first: every profile must know how to find peers
+    # without any profile name hardcoded in shipped files (2026-08-07).
+    discovery = (
+        "- Peer discovery: `hermes profile list`, `--role list` "
+        "(roles.yaml) — who exists, who holds which grants; keep the "
+        "peer/role list in memory current, refresh when roles change.\n"
+    )
     comms = {
         "contributor": (
             "### Inter-agent communication\n"
+            f"{discovery}"
             "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
             "the terminal tool — one at a time, blocks until the peer's "
             "final message returns.\n"
@@ -253,6 +260,7 @@ def _soul_block(role: str) -> str:
         ),
         "manager": (
             "### Inter-agent communication\n"
+            f"{discovery}"
             "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
             "the terminal tool — task + intent + expected response form; "
             "one at a time, blocks until the peer's final message returns.\n"
@@ -261,6 +269,7 @@ def _soul_block(role: str) -> str:
         ),
         "combined": (
             "### Inter-agent communication\n"
+            f"{discovery}"
             "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
             "the terminal tool — one at a time, blocks until the peer's "
             "final message returns.\n"
