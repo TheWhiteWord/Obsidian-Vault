@@ -819,6 +819,40 @@ structured records, parties-only write).
 - ☐ Phase 4 integration checks — mutations/growth verbs vs the registry,
   reference-file drift, READMEs (tracker).
 
+### Plugin update refresh verb (2026-08-07) ☑
+*Proves: users can pull plugin changes without reinstalling.* Code is
+distributed via git (`hermes plugins install/update`); the per-profile
+COPIES the installer wrote once — SOUL managed blocks (new sections land
+there), the peer/role memory seed, skill overlays, config seeds, plugin
+enablement, manager cron — go stale on their own. The refresh verb
+re-applies them idempotently.
+
+**Design decision (2026-08-07):** refresh is an explicit command
+(`python scripts/setup.py --refresh`), not an auto-migration at plugin
+load — the user chooses when to re-apply installer state. It is
+discovery-driven: vault-bound profiles are found from the live install
+(`.env` with `OBSIDIAN_VAULT_PATH`, or a SOUL carrying the anchor — the
+setup state file is wiped at finalize, so the SOUL block is the durable
+role record), and each role is read back from the block's role-keyed ops
+bullets via `detect_soul_role` (contributor/manager/combined). It never
+touches grants (`roles.yaml` is vault policy), never rewrites user
+identity prose (block-only path), never clobbers a converged memory
+note, and leaves existing cron jobs untouched. Unrecognized/legacy
+blocks are reported SKIPPED, never guessed at.
+
+- ☑ `refresh_profiles(hermes_home)` in `vault_ops.py` — runs the same
+  idempotent ensures finalize runs (skills, SOUL, memory seed, config,
+  plugin enable, manager cron) per vault-bound profile; `--dry-run`
+  previews.
+- ☑ CLI: `scripts/setup.py --refresh` (README gains the update ritual:
+  `hermes plugins update` → `setup.py --refresh` → restart).
+- ☑ Tests: 6 new (role detection from block, stale-SOUL upgrade with
+  prose preserved, unbound skipped, legacy skipped, idempotent, manager
+  cron) — 435 green.
+- ☑ Live vault: dry-run + real run refresh all five profiles, roles
+  detected correctly (4 contributor, 1 manager), cron untouched, second
+  run byte-identical (idempotency proven).
+
 ### P6 — Coder-plugin interaction ☐
 *Deferred (2026-08-04): a specific feature needing its own research and
 design, and a lot of background work (Davide).* Prerequisites to resolve
@@ -890,9 +924,9 @@ Work that landed during P0–P2 but was not in the original trajectory:
 ## Resume state (for a fresh session)
 
 **What exists:** a complete, tested, enabled vault engine + installer. Plugin
-at `~/.hermes/plugins/obsidian-vault/`. **213 pytest tests**, all green
-(P4 added the issue ledger + maintenance sweep, 204 → 213 after tool wiring).
-Clean-slate
+at `~/.hermes/plugins/obsidian-vault/`. **435 pytest tests**, all green
+(2026-08-07: inter-agent protocol P9 + awareness + refresh verb; P4 added
+the issue ledger + maintenance sweep). Clean-slate
 E2E verified 2026-08-03: full install from zero profiles/vault; the standard
 install ships the full five-agent set active (P3.7e); deny-by-default protects
 unlisted agents. P4 verified 2026-08-04: from-zero re-scaffold + live sweep
