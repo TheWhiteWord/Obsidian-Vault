@@ -44,11 +44,18 @@ def is_ownership_glob(pattern: str) -> bool:
 
 
 def _matches(pattern: str, target: str) -> bool:
-    """Match a canonical ownership glob (literal segments + optional ``/**``)."""
-    if pattern.endswith("/**"):
-        base = pattern[:-3]
-        return target == base or target.startswith(base + "/")
-    return target == pattern
+    """Match a canonical ownership glob (literal segments + optional ``/**``).
+
+    Case-insensitive (casefold): folder casing is cosmetic, so a rename
+    like ``creative`` → ``Creative`` never breaks ownership — the glob
+    still resolves to the same derived owner.
+    """
+    p = pattern.casefold()
+    t = target.casefold()
+    if p.endswith("/**"):
+        base = p[:-3]
+        return t == base or t.startswith(base + "/")
+    return t == p
 
 
 def _segments(pattern: str) -> int:
@@ -102,7 +109,7 @@ def duplicate_ownership_globs(
         for pattern in globs:
             if not is_ownership_glob(pattern):
                 continue
-            norm = pattern.strip("/")
+            norm = pattern.strip("/").casefold()
             if norm in holder and holder[norm] != agent:
                 conflicts.append(f"{norm} ({holder[norm]} and {agent})")
             else:

@@ -285,6 +285,43 @@ def test_role_unbind_subdomain_keeps_parent_read_with_sibling(tmp_path):
     assert registry.allows("researcher", "read", "work/recipes/projects/x.md")
 
 
+def test_role_unbind_after_manual_case_rename(tmp_path):
+    """A case-only folder rename never breaks unbind — globs are found
+    case-insensitively, so no unbind/bind dance is needed."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "writer")
+    installer.role_bind(hermes, vault, "writer", domain="recipes")
+
+    (vault / "work" / "recipes").rename(vault / "work" / "Recipes")
+
+    installer.role_unbind(hermes, vault, "writer", domain="Recipes")
+
+    registry = load_roles(vault)
+    assert not registry.allows("writer", "create", "work/recipes/note.md")
+
+
+def test_bind_domain_reuses_renamed_container(tmp_path):
+    """A manually renamed `work` container is reused, never shadow-created:
+    a new domain lands under the real container, and the case-insensitive
+    grants still cover it."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "creative")
+
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+    (vault / "work").rename(vault / "Work")   # user renames the container
+
+    installer.role_bind(hermes, vault, "creative", domain="ideas")
+
+    # The new domain lives under the real container; no shadow `work/`.
+    assert (vault / "Work" / "ideas" / ".vault" / "config.yaml").is_file()
+    assert not (vault / "work").exists()
+    assert (vault / "Work" / "recipes").is_dir()   # original tree untouched
+
+    registry = load_roles(vault)
+    assert registry.allows("creative", "create", "work/ideas/note.md")
+    assert registry.allows("creative", "create", "work/recipes/note.md")
+
+
 # --- role_bind (P6, 06-growth-design §4.5) ---------------------------------
 
 def _bound_contributor(hermes: Path, vault: Path, name: str) -> Path:

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -55,7 +56,8 @@ CHECKPOINT_FILENAME = "checkpoint.json"
 FINDINGS_DIRNAME = "findings"
 
 #: All checks, so auto-resolve can re-run any one of them by name.
-CHECKS = ("dangling", "orphan", "malformed", "empty", "missing_field")
+CHECKS = ("dangling", "orphan", "malformed", "empty", "missing_field",
+          "case_collision")
 
 
 class MaintainError(Exception):
@@ -220,6 +222,57 @@ def _check_missing_fields(note: Note, vault_root: Path) -> Optional[Dict[str, An
     return None
 
 
+def _check_case_collisions(root: Path) -> List[Dict[str, Any]]:
+    """Sibling folders whose names differ only by case — the one ambiguity
+    case-insensitive resolution cannot pick between.
+
+    One finding per colliding group, targeted at the parent folder. The
+    collision is structural, so it lives in the full census (not the delta
+    checkpoint pass): it appears when a folder is created or renamed, and
+    the next census re-checks it.
+    """
+    from .constants import SKIP_DIRS
+
+    findings: List[Dict[str, Any]] = []
+    for directory, dirnames, _filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        by_case: Dict[str, List[str]] = {}
+        for name in dirnames:
+            by_case.setdefault(name.casefold(), []).append(name)
+        for names in by_case.values():
+            if len(names) > 1:
+                rel = relative_to_vault(root, Path(directory))
+                findings.append(_finding(
+                    "case_collision", rel, "medium",
+                    "Folders differ only by case: " + ", ".join(sorted(names)),
+                    "Rename one — case-insensitive matching treats them "
+                    "as one scope"))
+    return findings
+
+
+def _parent_has_case_collision(vault_root: Path, parent_rel: str) -> bool:
+    """True when ``parent_rel`` still contains case-colliding siblings.
+
+    The auto-resolve condition for ``case_collision`` findings. Unverifiable
+    (path missing/illegal) keeps the issue open rather than closing on a
+    guess.
+    """
+    from .constants import SKIP_DIRS
+
+    try:
+        parent = safe_join(vault_root, parent_rel)
+    except Exception:  # noqa: BLE001 — cannot verify, keep the issue open
+        return True
+    if not parent.is_dir():
+        return False
+    by_case: Dict[str, List[str]] = {}
+    for child in parent.iterdir():
+        if not child.is_dir() or child.name in SKIP_DIRS:
+            continue
+        by_case.setdefault(child.name.casefold(), []).append(child.name)
+    return any(len(names) > 1 for names in by_case.values())
+
+
 def run_delta(
     vault_root: Path,
     agent: str,
@@ -325,13 +378,15 @@ def _promote_vocabulary(
 # ---------------------------------------------------------------------------
 
 def run_census(vault_root: Path) -> List[Dict[str, Any]]:
-    """Full-vault B1: dangling, orphans, malformed, empty, missing fields."""
+    """Full-vault B1: dangling, orphans, malformed, empty, missing fields,
+    case-colliding folders."""
     root = Path(vault_root).resolve()
     notes = list(iter_notes(root))
     g = graph_mod.build_graph(root, notes)
     note_map = {n.path: n for n in notes}
 
     findings: List[Dict[str, Any]] = []
+    findings.extend(_check_case_collisions(root))
     for from_path, _label in g.dangling:
         findings.append(_check_dangling(g, from_path) or _finding(
             "dangling", from_path, "medium",
@@ -584,6 +639,8 @@ def _condition_holds(
         return bool(note and not note.error and not note.content.strip())
     if check == "missing_field":
         return _check_missing_fields(note, vault_root) is not None if note else False
+    if check == "case_collision":
+        return _parent_has_case_collision(vault_root, target)
     # Unknown check: keep it open rather than close on a guess.
     return True
 

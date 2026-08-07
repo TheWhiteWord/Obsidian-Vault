@@ -1407,13 +1407,14 @@ def _domain_owned_globs(roles_path: Path, profile: str,
     """Globs a profile actually holds under ``work/<domain>/``, by kind."""
     import re as _re
     prefix = f"work/{domain}/"
+    folded_prefix = prefix.casefold()
     block = _block_text(roles_path, profile)
     pairs: list[tuple[str, list[str]]] = []
     for m in _re.finditer(r"(?m)^    ([a-zA-Z0-9_-]+):\s*\[(.*?)\]",
                           block):
         kind, raw = m.group(1), m.group(2)
         owned = [g for g in _re.findall(r'"([^"]+)"', raw)
-                 if g.startswith(prefix)]
+                 if g.casefold().startswith(folded_prefix)]
         if owned:
             pairs.append((kind, owned))
     return pairs
@@ -1595,7 +1596,11 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         # P7: refuse before any write — shape, content-not-subdomain, and
         # duplicate-ownership violations must not create a directory first.
         _validate_domain_bind(roles_path, profile, domain)
-        domain_dir = vault_root / "work" / domain
+        # Case-correcting resolution (vault.paths.safe_join): a renamed
+        # `work`/parent container is reused, never shadow-created; the new
+        # domain keeps the caller's spelling.
+        from vault.paths import safe_join as _safe_join
+        domain_dir = _safe_join(vault_root, f"work/{domain}")
         if not domain_dir.is_dir() and not dry_run:
             (domain_dir / ".vault").mkdir(parents=True, exist_ok=True)
             if config_file:
@@ -1620,7 +1625,8 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         # Refuse before any write — duplicate ownership must not create a
         # directory first.
         _validate_system_bind(roles_path, profile)
-        sys_dir = vault_root / "system"
+        from vault.paths import safe_join as _safe_join
+        sys_dir = _safe_join(vault_root, "system")
         if not sys_dir.is_dir() and not dry_run:
             (sys_dir / ".vault").mkdir(parents=True, exist_ok=True)
             if config_file:

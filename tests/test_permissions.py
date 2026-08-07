@@ -55,6 +55,39 @@ class TestWriteBoundary:
             write_note(vault, "tww", empty, "CREATIVE/PHILOSOPHY/x.md", GOOD_FM)
 
 
+class TestCaseTolerance:
+    """Folder casing is cosmetic: grants match case-insensitively and
+    writes resolve to the real on-disk folder — never a shadow tree."""
+
+    def test_write_with_different_case_lands_in_real_folder(
+            self, vault_with_roles, roles):
+        out = write_note(vault_with_roles, "tww", roles,
+                         "creative/philosophy/case-tolerance.md",
+                         GOOD_FM, "Body.")
+        assert out.created is True
+        assert (vault_with_roles
+                / "CREATIVE/PHILOSOPHY/case-tolerance.md").is_file()
+        # No parallel lowercase tree appeared.
+        assert not (vault_with_roles / "creative").exists()
+        # The tool reports the real on-disk casing back.
+        assert out.path == "CREATIVE/PHILOSOPHY/case-tolerance.md"
+
+    def test_edit_with_different_case_finds_the_same_note(
+            self, vault_with_roles, roles):
+        write_note(vault_with_roles, "tww", roles,
+                   "CREATIVE/PHILOSOPHY/case-edit.md", GOOD_FM, "First body.")
+        out = write_note(vault_with_roles, "tww", roles,
+                         "creative/philosophy/case-edit.md",
+                         GOOD_FM, "Edited body.", overwrite=True)
+        assert out.created is False
+        text = (vault_with_roles / "CREATIVE/PHILOSOPHY/case-edit.md").read_text(
+            encoding="utf-8")
+        assert "Edited body." in text
+        assert "First body." not in text
+        assert len(list((vault_with_roles / "CREATIVE/PHILOSOPHY")
+                        .glob("case-edit*"))) == 1
+
+
 class TestAppendSemantics:
     """`append` creates; it must never edit or delete (§2.1).
 

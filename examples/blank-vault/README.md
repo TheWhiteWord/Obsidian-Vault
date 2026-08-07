@@ -97,6 +97,12 @@ that owns the affected folder is the one that fixes it.
 You almost never touch files or run commands yourself. Tell the right agent
 from the table above what you want, and it does the rest.
 
+**Names are flexible, capitals included.** The vault treats `Creative`,
+`creative`, and `CREATIVE` as the same folder — renaming a folder to
+change only its capitalisation breaks nothing. Two folders with the same
+name in different cases would confuse it; the nightly sweep catches that
+and files an issue.
+
 This file stays in sync with the vault: the manager checks the tree against
 the live vault during the maintenance sweep and files an issue if it
 drifts; the agent that owns this file applies the update.

@@ -43,6 +43,33 @@ def roles(vault_with_roles):
     return load_roles(vault_with_roles)
 
 
+class TestCaseCollision:
+    """Sibling folders differing only by case — the one ambiguity
+    case-insensitive resolution cannot pick between."""
+
+    def test_census_flags_case_colliding_folders(self, vault):
+        (vault / "CREATIVE" / "ideas").mkdir(parents=True)
+        (vault / "CREATIVE" / "Ideas").mkdir(parents=True)
+
+        findings = maintain.run_census(vault)
+        collisions = [f for f in findings if f["check"] == "case_collision"]
+        assert len(collisions) == 1
+        assert collisions[0]["path"] == "CREATIVE"
+        assert "ideas" in collisions[0]["detail"]
+        assert "Ideas" in collisions[0]["detail"]
+
+    def test_census_stays_quiet_without_collisions(self, vault):
+        findings = maintain.run_census(vault)
+        assert not any(f["check"] == "case_collision" for f in findings)
+
+    def test_auto_resolve_condition_tracks_the_fix(self, vault):
+        (vault / "CREATIVE" / "ideas").mkdir(parents=True)
+        (vault / "CREATIVE" / "Ideas").mkdir(parents=True)
+        assert maintain._parent_has_case_collision(vault, "CREATIVE")
+        (vault / "CREATIVE" / "Ideas").rmdir()
+        assert not maintain._parent_has_case_collision(vault, "CREATIVE")
+
+
 class TestDeltaPass:
     def test_delta_detects_new_changes_only(self, vault_with_roles, roles):
         write_note(vault_with_roles, "system", roles,

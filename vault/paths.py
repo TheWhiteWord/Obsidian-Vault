@@ -52,6 +52,15 @@ def safe_join(vault_root: Path, relative: str) -> Path:
     Guards against ``../`` traversal and absolute paths. This is the chokepoint
     every path from an agent passes through — the permission model (P1) is only
     as good as the guarantee that a path stays inside the vault.
+
+    Path semantics are **case-insensitive**: a caller may name a folder in any
+    casing and it resolves to the real on-disk name. ``safe_join`` is the
+    single place that rewrites existing segments to the actual child's name —
+    so a write to ``WORK/...`` against a real ``work/`` lands in ``work/`` and
+    never creates a parallel tree. Nonexistent segments keep the caller's
+    spelling (a new folder's case is its creator's choice). When two siblings
+    differ only by case, the first in casefolded-sorted order wins; the
+    maintain sweep flags the collision as an issue.
     """
     root = Path(vault_root).resolve()
     raw = (relative or "").strip()
@@ -73,7 +82,55 @@ def safe_join(vault_root: Path, relative: str) -> Path:
         raise VaultPathError(
             f"path escapes the vault: {relative!r} resolves outside {root}"
         )
-    return candidate
+    if candidate == root:
+        return root
+    return _case_correct(root, candidate)
+
+
+def _case_correct(root: Path, target: Path) -> Path:
+    """Rewrite ``target``'s existing segments to their real on-disk names.
+
+    Walks segment by segment from the vault root. A segment whose exact name
+    exists is kept as-is; otherwise the directory is scanned for a child
+    matching case-insensitively and that child's real name is used; otherwise
+    the caller's segment is kept (the path is new — its case is the creator's
+    choice). Case-colliding siblings resolve to the first in casefolded-sorted
+    order (deterministic; the maintain sweep flags the collision).
+    """
+    try:
+        rel = target.relative_to(root)
+    except ValueError:
+        return target  # already verified inside root — defensive
+    current = root
+    for part in rel.parts:
+        exact = current / part
+        if os.path.lexists(exact):
+            current = exact
+            continue
+        match = _casefold_child(current, part)
+        current = match if match is not None else exact
+    return current
+
+
+def _casefold_child(directory: Path, name: str) -> Optional[Path]:
+    """A child of ``directory`` whose name casefolds to ``name``, or None.
+
+    Deterministic on collision: the first in (casefolded name, real name)
+    sorted order wins.
+    """
+    folded = name.casefold()
+    best: Optional[Path] = None
+    try:
+        children = list(directory.iterdir())
+    except OSError:
+        return None
+    for child in children:
+        if child.name.casefold() != folded:
+            continue
+        if best is None or (child.name.casefold(), child.name) < (
+                best.name.casefold(), best.name):
+            best = child
+    return best
 
 
 def relative_to_vault(vault_root: Path, path: Path) -> str:

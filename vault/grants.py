@@ -100,6 +100,11 @@ def path_matches(pattern: str, path: str) -> bool:
     The single glob language for the engine: grant patterns (this module)
     and search ``scope`` patterns (``vault/query.py``) mean the same thing.
 
+    Matching is **case-insensitive** (casefold): folder casing is cosmetic,
+    so a grant written for ``work/creative/**`` still covers a folder the
+    user renamed to ``Creative`` — and ``safe_join`` resolves writes to the
+    real on-disk name.
+
     ``pattern`` is a single glob with no negation. Search scopes compose
     several of them — positives plus ``!``-prefixed exclusions — via
     :func:`scope_matches`; grants are positive-only by design, so grant
@@ -162,7 +167,7 @@ def _match_parts(pattern: List[str], target: List[str]) -> bool:
 
     if not target:
         return False
-    if not fnmatch.fnmatchcase(target[0], head):
+    if not fnmatch.fnmatchcase(target[0].casefold(), head.casefold()):
         return False
     return _match_parts(rest, target[1:])
 

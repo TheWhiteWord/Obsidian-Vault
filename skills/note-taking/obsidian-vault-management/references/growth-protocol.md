@@ -134,6 +134,12 @@ The old globs are revoked, the new ones granted; the tree is whatever the
 user already renamed it to. Do this right after a rename — until then the
 domain is unowned and nobody can write to it.
 
+- **Case is cosmetic.** The engine matches paths case-insensitively: a
+  case-only rename (`creative` → `Creative` or `CREATIVE`) needs no
+  unbind/bind — grants keep resolving, writes land in the real folder, and
+  the tools report the real on-disk casing back. Rename folders to any
+  style you like; the system digests it.
+
 - **Detecting a rename:** the manager's verify step (grant-anchor check)
   catches the mismatch — a `work/` write-glob whose base no longer exists.
   Raise the issue first, then run the two commands.
@@ -144,8 +150,7 @@ domain is unowned and nobody can write to it.
   location — not `--role`.
 - **Conventions are in-tree (spec 07), so they follow the folder.** The
   root `.vault/conventions.md`, or the scope's own — a rename moves them
-  with the tree; nothing re-registers. (The old per-profile
-  `conventions/<vault>-conventions.md` + SOUL manifest model is retired.)
+  with the tree; nothing re-registers.
 
 ## Pitfalls
 

@@ -79,6 +79,14 @@ class TestOwnerOf:
         assert owner_of(globs, "work/coding/note.md") is None
         assert owner_of(globs, "work") is None
 
+    def test_matching_is_case_insensitive(self):
+        # Folder casing is cosmetic: a rename (creative → Creative) never
+        # breaks ownership — the glob still resolves to the same owner.
+        globs = {"writer": ["work/creative/**"]}
+        assert owner_of(globs, "work/Creative/projects/idea.md") == "writer"
+        assert owner_of(globs, "WORK/CREATIVE/projects/idea.md") == "writer"
+        assert owner_of(globs, "WORK/creative/knowledge/k.md") == "writer"
+
     def test_deterministic_tie_break(self):
         # A duplicate is refused at bind; the resolver still picks one agent
         # deterministically (lexicographic) rather than blowing up.
@@ -105,6 +113,15 @@ class TestDuplicateOwnershipGlobs:
         assert duplicate_ownership_globs(
             {"a": ["work/*/knowledge/**"], "b": ["work/*/knowledge/**"]}
         ) == []
+
+    def test_case_variants_are_the_same_scope(self):
+        # Two agents holding the same scope in different casing would make
+        # ownership ambiguous — matching is case-insensitive, so the globs
+        # are one scope and bind must refuse.
+        conflicts = duplicate_ownership_globs(
+            {"a": ["work/creative/**"], "b": ["work/Creative/**"]}
+        )
+        assert len(conflicts) == 1
 
 
 class TestShadowing:
