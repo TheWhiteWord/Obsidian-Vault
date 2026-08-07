@@ -30,7 +30,7 @@ from vault_ops import (_active_agent_names, _block_text, _create_profile,
                        _soul_identity, enable_plugin_for_profile,
                        ensure_peer_memory, ensure_soul_sections,
                        install_cron_jobs, install_skills, profile_home,
-                       scaffold_vault, seed_profile_config)
+                       refresh_profiles, scaffold_vault, seed_profile_config)
 
 # --- setup stage machine (P6 redesign, 2026-08-05) -------------------------
 
@@ -308,9 +308,19 @@ def main() -> int:
                          "and start over")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print actions without performing them")
+    ap.add_argument("--refresh", action="store_true",
+                    help="Re-apply the installer's per-profile state to a "
+                         "live install (SOUL blocks, memory seeds, skills, "
+                         "config, plugin enable) — run after `hermes "
+                         "plugins update` to pick up new managed sections")
     args = ap.parse_args()
 
     hermes_home = Path(os.environ.get("HERMES_HOME", "~/.hermes")).expanduser()
+
+    if args.refresh:
+        for line in refresh_profiles(hermes_home, dry_run=args.dry_run):
+            print(f"{B_MARK} {line}")
+        return 0
 
     if not args.setup:
         ap.print_help()

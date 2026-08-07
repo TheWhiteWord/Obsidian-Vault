@@ -676,6 +676,98 @@ def ensure_peer_memory(hermes_home: Path, name: str) -> bool:
     return True
 
 
+def detect_soul_role(soul_text: str) -> str | None:
+    """The role a profile's SOUL managed block encodes (refresh path).
+
+    Reads the role back from the live block — the durable record after
+    setup (the questionnaire state is wiped at finalize). Markers are
+    the role-keyed ops bullets from `_soul_block`: combined states the
+    dual role once, manager names the management skill, contributor
+    names the writing skill. None when the block is unrecognized
+    (pre-P5b directive or an unknown future version) — refresh must not
+    guess.
+    """
+    if "Dual role" in soul_text:
+        return "combined"
+    if "sweep, triage, and growth flows" in soul_text:
+        return "manager"
+    if "writing loop and the conventions" in soul_text:
+        return "contributor"
+    return None
+
+
+def _env_value(env_path: Path, key: str) -> str | None:
+    """Value of KEY in a .env file (None when missing)."""
+    if not env_path.is_file():
+        return None
+    prefix = f"{key}="
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix):].strip()
+    return None
+
+
+def refresh_profiles(hermes_home: Path, dry_run: bool = False) -> list[str]:
+    """Re-apply the installer's per-profile state to a live install.
+
+    After `hermes plugins update` brings new code, the per-profile
+    COPIES the installer wrote once can go stale: SOUL managed blocks
+    (new sections land here), the peer/role memory seed, skill overlays,
+    config seeds, plugin enablement, manager cron. This re-runs the same
+    idempotent ensures setup's finalize runs, for every vault-bound
+    profile discovered from the live install — no questionnaire, no
+    profile creation, no grant changes (roles.yaml is vault policy, not
+    installer state).
+
+    Vault-bound = the profile's .env declares OBSIDIAN_VAULT_PATH, or
+    its SOUL.md carries the anchor. Role is read back from the live
+    block via `detect_soul_role` (the setup state file is wiped at
+    finalize, so the block is the durable record). User identity prose
+    is preserved: the block-only path (identity="") never rewrites
+    prose. Returns recap lines.
+    """
+    out: list[str] = []
+    homes = [("default", hermes_home)]
+    prof_dir = hermes_home / "profiles"
+    if prof_dir.is_dir():
+        homes += sorted((p.name, p) for p in prof_dir.iterdir() if p.is_dir())
+
+    for name, home in homes:
+        soul = home / "SOUL.md"
+        env = home / ".env"
+        vault_path = _env_value(env, "OBSIDIAN_VAULT_PATH")
+        bound = vault_path is not None
+        text = ""
+        if soul.is_file():
+            text = soul.read_text(encoding="utf-8")
+            if SOUL_ANCHOR in text:
+                bound = True
+        if not bound:
+            continue
+        role = detect_soul_role(text)
+        if role is None:
+            out.append(f"refresh {name}: SKIPPED (unrecognized SOUL "
+                       "block — run setup to re-bind)")
+            continue
+        if dry_run:
+            out.append(f"[dry-run] refresh {name}: role={role}")
+            continue
+        install_skills(home / "skills", role=role)
+        ensure_soul_sections(soul, role, profile_name=name, identity="")
+        ensure_peer_memory(hermes_home, name)
+        seed_profile_config(hermes_home, name)
+        if vault_path is None:
+            out.append(f"refresh {name}: WARNING no OBSIDIAN_VAULT_PATH "
+                       "in .env — plugin enable skipped")
+        else:
+            enable_plugin_for_profile(hermes_home, name, Path(vault_path))
+        if role in ("manager", "combined"):
+            out.extend(install_cron_jobs(name))
+        out.append(f"refresh {name}: role={role}")
+
+    return out
+
+
 def enable_plugin_for_profile(hermes_home: Path, name: str, vault_root: Path) -> None:
     """Make the obsidian-vault plugin available and correctly scoped for a profile.
 

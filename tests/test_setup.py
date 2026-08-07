@@ -1033,3 +1033,146 @@ def test_starter_roles_globs_reach_domain_paths(tmp_path):
     assert roles.allows("default", "edit", ".vault/conventions.md")
     assert not roles.allows("creative", "edit", ".vault/conventions.md")
     assert not roles.allows("vault-manager", "edit", ".vault/conventions.md")
+
+
+# --- refresh_profiles (2026-08-07) ------------------------------------------
+
+def _refresh_scratch(tmp_path, monkeypatch):
+    """Scratch HERMES_HOME with a vault-bound contributor profile + faked
+    hermes subprocess calls (plugin enable / cron)."""
+    import subprocess
+    home = tmp_path / "home"
+    prof = home / "profiles" / "creative"
+    prof.mkdir(parents=True)
+    (prof / ".env").write_text(
+        "OBSIDIAN_VAULT_PATH=/vault\nOBSIDIAN_VAULT_AGENT=creative\n",
+        encoding="utf-8")
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(list(cmd))
+        if cmd[-2:] == ["cron", "list"]:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    return home, prof, calls
+
+
+def test_refresh_detects_soul_role_from_block():
+    """The live SOUL block is the durable role record (setup state is
+    wiped at finalize) — markers are the role-keyed ops bullets."""
+    assert installer.detect_soul_role(installer._soul_block("contributor")) \
+        == "contributor"
+    assert installer.detect_soul_role(installer._soul_block("manager")) \
+        == "manager"
+    assert installer.detect_soul_role(installer._soul_block("combined")) \
+        == "combined"
+    assert installer.detect_soul_role("no block here") is None
+
+
+def test_refresh_updates_stale_soul(tmp_path, monkeypatch):
+    """A profile whose SOUL block predates the awareness section gets it
+    after refresh; the block is replaced in place, prose preserved."""
+    home, prof, _ = _refresh_scratch(tmp_path, monkeypatch)
+    soul = prof / "SOUL.md"
+    # A stale block: the pre-awareness `## Vault` umbrella only.
+    soul.write_text(
+        "# Identity\nYou are the creative partner.\n\n"
+        "<!-- vault-soul: managed by the installer; do not edit -->\n"
+        "## Vault\n"
+        "- Operating this vault — tools, conventions, issues, and "
+        "maintenance.\n"
+        "### Vault operations\n"
+        "- For any task touching an Obsidian vault, load the "
+        "`obsidian-vault` skill first — it holds the writing loop "
+        "and the conventions.\n",
+        encoding="utf-8")
+    # install_skills expects a real skills tree; create it empty so the
+    # symlink-ensure works against the bundle.
+    (prof / "skills").mkdir(parents=True, exist_ok=True)
+
+    lines = installer.refresh_profiles(home)
+    assert any("creative" in ln for ln in lines)
+
+    text = soul.read_text(encoding="utf-8")
+    assert "## Inter-agent awareness" in text
+    assert text.index("## Inter-agent awareness") < text.index("## Vault")
+    assert "You are the creative partner." in text   # prose preserved
+    assert "writing loop and the conventions" in text  # contributor role kept
+    # memory seed landed
+    assert (prof / "memories" / "MEMORY.md").is_file()
+
+
+def test_refresh_skips_unbound_profile(tmp_path, monkeypatch):
+    """A profile with no .env and no SOUL anchor is not touched."""
+    import subprocess
+    home = tmp_path / "home"
+    prof = home / "profiles" / "unbound"
+    prof.mkdir(parents=True)
+    (prof / "SOUL.md").write_text("# Identity\nNot vault-bound.\n",
+                                  encoding="utf-8")
+    monkeypatch.setattr(subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(
+                            cmd, 0, "", ""))
+    lines = installer.refresh_profiles(home)
+    assert lines == []
+    assert "Not vault-bound." in (prof / "SOUL.md").read_text(encoding="utf-8")
+
+
+def test_refresh_skips_unrecognized_block(tmp_path, monkeypatch):
+    """A vault-bound profile whose block is unrecognized (e.g. a legacy
+    pre-P5b directive) is reported, not guessed at."""
+    import subprocess
+    home = tmp_path / "home"
+    prof = home / "profiles" / "legacy"
+    prof.mkdir(parents=True)
+    (prof / ".env").write_text("OBSIDIAN_VAULT_PATH=/vault\n",
+                               encoding="utf-8")
+    (prof / "SOUL.md").write_text(
+        "# Identity\nLegacy.\n\n## Vault operations\n"
+        "For any task touching an Obsidian vault, load the "
+        "`obsidian-vault` skill first.\n",
+        encoding="utf-8")
+    monkeypatch.setattr(subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(
+                            cmd, 0, "", ""))
+    lines = installer.refresh_profiles(home)
+    assert any("SKIPPED" in ln for ln in lines)
+    assert "## Inter-agent awareness" not in \
+        (prof / "SOUL.md").read_text(encoding="utf-8")
+
+
+def test_refresh_idempotent(tmp_path, monkeypatch):
+    """A second refresh changes nothing (the ensures are convergent)."""
+    home, prof, _ = _refresh_scratch(tmp_path, monkeypatch)
+    (prof / "skills").mkdir(parents=True, exist_ok=True)
+    installer.ensure_soul_sections(prof / "SOUL.md", "contributor",
+                                   profile_name="creative")
+    before = (prof / "SOUL.md").read_text(encoding="utf-8")
+    installer.refresh_profiles(home)
+    after = (prof / "SOUL.md").read_text(encoding="utf-8")
+    assert after == before
+
+
+def test_refresh_manager_gets_cron(tmp_path, monkeypatch):
+    """A manager-role profile gets the maintenance cron re-installed."""
+    import subprocess
+    home = tmp_path / "home"
+    prof = home / "profiles" / "vault-manager"
+    prof.mkdir(parents=True)
+    (prof / ".env").write_text("OBSIDIAN_VAULT_PATH=/vault\n",
+                               encoding="utf-8")
+    (prof / "skills").mkdir(parents=True, exist_ok=True)
+    installer.ensure_soul_sections(prof / "SOUL.md", "manager",
+                                   profile_name="vault-manager",
+                                   identity="manager")
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(list(cmd))
+        if cmd[-2:] == ["cron", "list"]:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    lines = installer.refresh_profiles(home)
+    assert any("cron" in ln for ln in lines)
+    assert any("cron" in " ".join(c) for c in calls)

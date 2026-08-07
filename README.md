@@ -34,6 +34,26 @@ PATH. Python 3.9+. Nothing else — no running Obsidian, no other services.
   come back machine-readable (`SETUP:question` JSON) and the agent relays
   them.
 
+### Updating (2026-08-07)
+
+Code updates are Hermes-native: `hermes plugins update` pulls the latest
+repo. But the installer also writes per-profile COPIES — SOUL managed
+blocks (new sections land there), the peer/role memory seed, skill
+overlays, config seeds, plugin enablement — and those are not refreshed
+by a code pull. Run the refresh verb after updating to re-apply them:
+
+```bash
+python scripts/setup.py --refresh     # idempotent; --dry-run to preview
+```
+
+Refresh discovers vault-bound profiles from the live install (`.env`
+with `OBSIDIAN_VAULT_PATH`, or a SOUL carrying the vault anchor), reads
+each profile's role back from its SOUL block, and re-runs the same
+idempotent ensures setup's finalize runs. It never touches grants
+(`roles.yaml` is vault policy), never rewrites user identity prose, and
+never clobbers a converged memory note. Restart Hermes after refreshing
+so the new tools load.
+
 ## What you get
 
 | Preset | Vault | Profiles | Use when |
