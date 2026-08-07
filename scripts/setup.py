@@ -107,11 +107,13 @@ def _stage_question(stage: str) -> dict:
     """The question for a stage — relayed verbatim by the agent."""
     if stage == "location":
         return {"stage": stage, "kind": "text",
-                "prompt": "Where should the vault live? (absolute path)"}
+                "prompt": "Where should the vault live? (absolute path "
+                          "to the parent folder — the vault gets its own "
+                          "folder inside it)"}
     if stage == "name":
         return {"stage": stage, "kind": "text",
-                "prompt": "Vault name (used for conventions files, e.g. "
-                          "<name>-conventions.md)"}
+                "prompt": "Vault name (the folder that will hold the "
+                          "vault, e.g. MyVault)"}
     if stage == "preset":
         return {"stage": stage, "kind": "choice",
                 "prompt": "Which preset?", "choices": ["standard", "blank"]}
@@ -136,6 +138,8 @@ def _validate_answer(stage: str, answer: str, hermes_home: Path) -> tuple[bool, 
             return False, "vault name cannot be empty"
         if "/" in answer or "\\" in answer:
             return False, "vault name cannot contain slashes"
+        if answer.strip() in (".", ".."):
+            return False, "vault name cannot be '.' or '..'"
         return True, ""
     if stage == "preset":
         if answer not in ("standard", "blank"):
@@ -186,6 +190,15 @@ def _assignments(state: dict) -> dict[str, set[str]]:
     return out
 
 
+def _vault_root(state: dict) -> Path:
+    """The vault root: the name answer names the vault's folder inside the
+    location (2026-08-07) — the user picks the parent and the name; the
+    installer creates `<location>/<name>`."""
+    loc = Path(state["answers"]["location"]).expanduser()
+    name = state["answers"].get("name", "").strip()
+    return loc / name if name else loc
+
+
 def _build_stage(stage: str, answer: str, state: dict,
                  hermes_home: Path, dry_run: bool) -> list[str]:
     """Build the aspect a stage answer finalises. Returns recap lines.
@@ -196,7 +209,7 @@ def _build_stage(stage: str, answer: str, state: dict,
     the tree; finalize creates profiles + skills + SOUL + grants + env.
     """
     if stage == "preset":
-        vault_root = Path(state["answers"]["location"]).expanduser()
+        vault_root = _vault_root(state)
         created = scaffold_vault(vault_root, answer, dry_run=dry_run)
         return [f"vault scaffolded ({answer}): {len(created)} dirs"]
     if stage == "finalize":
@@ -212,7 +225,7 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
     here: a profile holding manager + any contributor gets the combined
     skill role and both directive files.
     """
-    vault_root = Path(state["answers"]["location"]).expanduser()
+    vault_root = _vault_root(state)
     roles_path = vault_root / ".vault" / "roles.yaml"
 
     # default always participates (system owner); named assignments on top.

@@ -71,10 +71,12 @@ class TestValidation:
         ok, _ = installer._validate_answer("location", "/tmp/v", scratch_home)
         assert ok
 
-    def test_name_rejects_slashes(self, scratch_home):
+    def test_name_rejects_slashes_and_dots(self, scratch_home):
         ok, alert = installer._validate_answer(
             "name", "a/b", scratch_home)
         assert not ok and "slashes" in alert
+        ok, alert = installer._validate_answer("name", "..", scratch_home)
+        assert not ok
         ok, _ = installer._validate_answer("name", "TWW", scratch_home)
         assert ok
 
@@ -252,7 +254,9 @@ class TestRunSetup:
 
     def test_full_standard_drive(self, scratch_home, capsys, monkeypatch):
         """The whole questionnaire against a scratch home, one-agent setup:
-        every role on the default profile → combined + grants unioned."""
+        every role on the default profile → combined + grants unioned.
+        Location = parent folder, name = vault folder (2026-08-07): the
+        vault lands at scratch_home/vault."""
         vault = scratch_home / "vault"
         # fake profile creation + plugin enable + cron (real CLI out of scope)
         monkeypatch.setattr(installer, "_create_profile",
@@ -261,7 +265,7 @@ class TestRunSetup:
                             lambda home, name, vault_root: None)
         monkeypatch.setattr(installer, "install_cron_jobs",
                             lambda profile, dry_run=False: [])
-        answers = [str(vault), "TWW", "standard",
+        answers = [str(scratch_home), "vault", "standard",
                    "default",  # manager → default
                    "default",  # creative → default
                    "default",  # dev → default
@@ -298,6 +302,10 @@ class TestRunSetup:
         assert "system/**" in parsed["agents"]["default"]["write"]
         assert "work/creative/**" in parsed["agents"]["default"]["write"]
         assert "work/coding/**" in parsed["agents"]["default"]["write"]
+        # the name answer named the vault: conventions title carries it
+        conv = (vault / ".vault" / "conventions.md").read_text(
+            encoding="utf-8")
+        assert conv.startswith("# vault — writing conventions")
         # state reset after finalize (next --setup starts a fresh run)
         state = installer._load_setup_state(scratch_home)
         assert state["stage"] == 0 and state["answers"] == {}
