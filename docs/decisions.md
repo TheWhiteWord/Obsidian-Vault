@@ -1,12 +1,14 @@
-# Design Decisions — 03
+# Design decisions (D1–D9)
 
-**Status:** settled · recorded 2026-08-03
-**Supersedes:** the "noise filter" reading of read grants in `01-vault-v2-model.md` §2.2
-**Companion:** `00-original-plugin-idea.md` (ambitions), `01-vault-v2-model.md` (data model), `TASKS.md` (trajectory)
+The plugin's settled-decisions ledger, archived from `specs/` on
+2026-08-07 when the design history was folded into this documentation
+tree. Design decisions with consequences land here once agreed;
+append-only — a decision is amended by a new entry, never rewritten in
+place.
 
-This file is the **settled-decisions ledger**. Design decisions with consequences
-land here once agreed; `01` and `TASKS.md` are updated to match. Append-only —
-a decision is amended by a new entry, never rewritten in place.
+The current state these decisions shaped lives in this folder's
+`concepts/` and `guides/`; this ledger records *why* they are the way
+they are.
 
 ---
 
