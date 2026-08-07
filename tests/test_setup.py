@@ -278,6 +278,54 @@ def test_seed_warns_when_no_default_config(tmp_path):
     assert not (prof / "config.yaml").exists()
 
 
+# --- peer/role memory seed (2026-08-07) -----------------------------------
+
+def test_peer_memory_seed_written_on_first_install(tmp_path):
+    """The universal seed lands in a fresh profile's memories dir."""
+    home = tmp_path / "home"
+    prof = home / "profiles" / "creative"
+    prof.mkdir(parents=True)
+    assert installer.ensure_peer_memory(home, "creative") is True
+    note = (prof / "memories" / "MEMORY.md").read_text(encoding="utf-8")
+    assert "none available yet" in note
+    assert "hermes profile list" in note
+    # Universal: never names a profile — installs are customizable.
+    assert "creative" not in note
+
+
+def test_peer_memory_seed_copy_if_missing(tmp_path):
+    """A maintained note is never clobbered on re-install."""
+    home = tmp_path / "home"
+    prof = home / "profiles" / "dev"
+    prof.mkdir(parents=True)
+    mem = prof / "memories" / "MEMORY.md"
+    mem.parent.mkdir(parents=True)
+    converged = "Peers: researcher (web only), vault-manager (sweep).\n"
+    mem.write_text(converged, encoding="utf-8")
+    assert installer.ensure_peer_memory(home, "dev") is False
+    assert mem.read_text(encoding="utf-8") == converged
+
+
+def test_peer_memory_seed_idempotent(tmp_path):
+    """Second install leaves the same seed untouched."""
+    home = tmp_path / "home"
+    prof = home / "profiles" / "researcher"
+    prof.mkdir(parents=True)
+    assert installer.ensure_peer_memory(home, "researcher") is True
+    mem = prof / "memories" / "MEMORY.md"
+    before = mem.read_text(encoding="utf-8")
+    assert installer.ensure_peer_memory(home, "researcher") is False
+    assert mem.read_text(encoding="utf-8") == before
+
+
+def test_peer_memory_seed_default_profile(tmp_path):
+    """default's memory lives at the HERMES_HOME root, not under profiles/."""
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    assert installer.ensure_peer_memory(home, "default") is True
+    assert (home / "memories" / "MEMORY.md").is_file()
+
+
 # --- enable_plugin_for_profile ----------------------------------------------
 
 def test_enable_plugin_default_uses_bare_command(tmp_path, monkeypatch):
@@ -501,11 +549,14 @@ def test_soul_sections_contributor_has_lean_sections(tmp_path):
     # One `## Vault` umbrella with `###` subsections (2026-08-04); the
     # Convention manifest is retired (P7 — conventions are in-tree).
     assert "## Vault\n" in text
-    for section in ("### Vault operations", "### Issues",
-                    "### Inter-agent communication",
+    for section in ("## Inter-agent awareness", "## Vault",
+                    "### Vault operations", "### Issues",
                     "### Convention maintenance"):
         assert section in text
     assert "### Convention manifest" not in text
+    # Awareness comes BEFORE the Vault umbrella — it is the universal
+    # section, Vault is the vault-scoped one.
+    assert text.index("## Inter-agent awareness") < text.index("## Vault")
     # Lean pointers: tools/references, not prose instruction.
     assert "obsidian_issue" in text
     assert "references/issues.md" in text
@@ -546,7 +597,8 @@ def test_soul_sections_manager_sees_sweep_only(tmp_path):
     assert "<vault>-conventions.md" not in text
     # Communication awareness is universal; the manager carries the
     # essentials inline (no contributor-only file → no dangling pointer).
-    assert "### Inter-agent communication" in text
+    assert "## Inter-agent awareness" in text
+    assert text.index("## Inter-agent awareness") < text.index("## Vault")
     assert "Peer discovery" in text
     assert "hermes profile list" in text
     assert "--role list" in text
@@ -568,7 +620,8 @@ def test_soul_sections_combined_dedicated_text(tmp_path):
     assert "Dual role" in text
     assert "obsidian_conventions" in text   # in-tree pointer (P7)
     # Communication awareness is universal; combined has the full reference.
-    assert "### Inter-agent communication" in text
+    assert "## Inter-agent awareness" in text
+    assert text.index("## Inter-agent awareness") < text.index("## Vault")
     assert "Peer discovery" in text
     assert "hermes profile list" in text
     assert "references/inter-agent-protocol.md" in text

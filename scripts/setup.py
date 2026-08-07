@@ -28,9 +28,9 @@ from pathlib import Path
 from vault_ops import (_active_agent_names, _block_text, _create_profile,
                        _grant_role, _revoke_globs, _role_skill,
                        _soul_identity, enable_plugin_for_profile,
-                       ensure_soul_sections, install_cron_jobs,
-                       install_skills, profile_home, scaffold_vault,
-                       seed_profile_config)
+                       ensure_peer_memory, ensure_soul_sections,
+                       install_cron_jobs, install_skills, profile_home,
+                       scaffold_vault, seed_profile_config)
 
 # --- setup stage machine (P6 redesign, 2026-08-05) -------------------------
 
@@ -246,6 +246,7 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
             identity = _soul_identity(roles) if created else ""
             ensure_soul_sections(soul, skill_role,
                                  profile_name=prof, identity=identity)
+            ensure_peer_memory(hermes_home, prof)
             seed_profile_config(hermes_home, prof)
             enable_plugin_for_profile(hermes_home, prof, vault_root)
         out.append(f"profile {prof}: {skill_role} "

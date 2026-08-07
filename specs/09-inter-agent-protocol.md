@@ -269,14 +269,42 @@ not be gated behind loading the obsidian-vault skill.
 "References — load what the task needs" and the tools appear in the tool
 routing table (`obsidian_protocol_list` · `obsidian_protocol`).
 
-**SOUL.md (`_soul_block`, role-keyed → both presets automatically)** — a
-lean `### Inter-agent communication` subsection for every role:
-- contributor / combined: transport (`hermes -p <profile> -z` via the
-  terminal tool, one at a time) + registry tools + the full reference.
-- manager: the essentials **inline** (transport + task/intent/expected
-  response form + registry read) — the manager skill has no
-  `inter-agent-protocol.md`, so a file pointer would dangle. No
+**SOUL.md (`_soul_block`, role-keyed → both presets automatically)** —
+the block now spans TWO top-level sections under one anchor: `##
+Inter-agent awareness` FIRST (the universal section), then `## Vault`.
+Both presets get it through `ensure_soul_sections` (called by setup
+`_finalize` and growth `role_bind`); `souls/*.md` identity prose is never
+touched — the section is generated, not baked into prose (2026-08-07).
+The awareness section carries:
+- **Peer discovery** — `hermes profile list` covers EVERY profile
+  (vault-bound or not); `--role list` / `roles.yaml` adds domain + grants
+  for those that own one. No profile name is ever hardcoded.
+- **Memory contract** — verify at session start with the discovery calls;
+  keep the peer/role list current; the note is essential, never erase it.
+- **Peer requests** — `hermes -p <profile> -z` via the terminal tool.
+- **Handoff registry** — role-aware: contributor/combined point at the
+  full reference; the manager carries the essentials inline (its skill
+  has no `inter-agent-protocol.md`, so a pointer would dangle). No
   duplication: one canonical file, contributor-side.
+
+**Memory seed (`ensure_peer_memory`, installed in EVERY case)** — the
+installer writes the universal seed into `<profile>/memories/MEMORY.md`
+on first bind (copy-if-missing, never clobbers a converged note):
+"Peers and roles: none available yet — discover with `hermes profile
+list` / `--role list` (roles.yaml) at session start; keep this note
+current (essential, never erase)." The seed is TRUE in every setup —
+single-agent (no peers, statement holds), multi-agent (converges at
+first session), blank (no domains yet) — so it is installable blindly.
+
+**Why no pre-populated list at standard install (the customization
+facts):** profile names ARE user-customizable at setup (`existing:NAME`
+maps any role onto any existing profile) and domains grow post-install
+(`bind --domain <name>`; blank starts with none). A pre-populated
+"creative → `work/creative/**`" list would be wrong for `existing:NAME`
+installs and stale the moment a domain is added — a hand-maintained
+declaration duplicating `roles.yaml`, which the derived-memory design
+explicitly avoids. The seed + session-start verification converges
+correctly in every case.
 
 Why SOUL, not only the skill: the SOUL block is installed on every profile
 regardless of skill loading, so a manager (or a contributor doing non-vault

@@ -803,9 +803,15 @@ structured records, parties-only write).
   `skills/note-taking/obsidian-vault/references/inter-agent-protocol.md`
   (grammar + transport; a plain reference shipping with the contributor
   skill — no separate bundle, decided 2026-08-07 cleanup).
-- ☑ Awareness: SKILL.md lists the reference + routing rows; `_soul_block`
-  gains `### Inter-agent communication` for all roles (role-keyed → both
-  presets; manager carries essentials inline) — spec-09 §9.
+- ☑ Awareness: `## Inter-agent awareness` is the FIRST top-level managed
+  SOUL section (before `## Vault`; role-keyed → both presets) — peer
+  discovery (`hermes profile list` = every profile, `--role list` =
+  domains), memory contract, transport, role-aware registry pointer;
+  SKILL.md lists the reference + routing rows — spec-09 §9.
+- ☑ Universal memory seed: `ensure_peer_memory` writes "none available
+  yet" into every profile's memories on first bind (setup + growth,
+  copy-if-missing) — no pre-population (names/domains customizable);
+  `remove_soul_sections` handles the two-section block — spec-09 §9.
 - ☑ Tests: 29 new (425 green) — validation, adversarial parties-gate matrix,
   party-filtered list, no-pollution, tool surface.
 - ☐ Installer/skill wiring, setup transport question, kanban variant, registry

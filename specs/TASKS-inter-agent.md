@@ -121,10 +121,24 @@ silently break what exists.
       is a Hermes capability, not a vault one — awareness must not be gated
       behind skill loading. Contributor SKILL.md: reference listed in
       "References — load what the task needs" + tools in the routing table.
-      `_soul_block` (role-keyed → both presets): lean `### Inter-agent
-      communication` for every role — contributor/combined point at the
+      `_soul_block` (role-keyed → both presets): `## Inter-agent awareness`
+      now the FIRST top-level managed section (before `## Vault`),
+      covering peer discovery (`hermes profile list` = every profile,
+      `--role list` = domains), the memory contract, peer requests, and
+      the role-aware handoff registry — contributor/combined point at the
       reference; manager carries the essentials inline (no dangling
-      pointer). Recorded in spec-09 §9. Tests extended (3 soul tests).
+      pointer). Recorded in spec-09 §9.
+- [x] **Universal memory seed (`ensure_peer_memory`).** The installer
+      writes the seed ("Peers and roles: none available yet — discover
+      with `hermes profile list` / `--role list` …") into
+      `<profile>/memories/MEMORY.md` on first bind, in EVERY case
+      (setup `_finalize` + growth `role_bind`; copy-if-missing, never
+      clobbers a converged note). True in every setup — single-agent,
+      multi-agent, blank. No pre-populated list: profile names are
+      user-customizable (`existing:NAME`) and domains grow post-install,
+      so a hardcoded list would be wrong/stale. `remove_soul_sections`
+      updated for the two-section block. Tests: 4 new (seed written /
+      copy-if-missing / idempotent / default path) — 429 green.
 
 ## Out of scope (explicitly NOT done this phase)
 

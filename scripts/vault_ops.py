@@ -176,10 +176,14 @@ def _soul_identity(roles: set[str]) -> str:
 def _soul_block(role: str) -> str:
     """The SOUL sections for a role: contributor | manager | combined.
 
-    One `## Vault` umbrella with lean `###` subsections (06-growth-design
-    §3.1). Every bullet names a tool or a reference — never prose
-    instruction. Contributor and combined carry the convention sections and
-    the manifest; the manifest starts empty-but-directed and the growth
+    Two top-level managed sections under one anchor (2026-08-07):
+    `## Inter-agent awareness` first — the universal peer/role awareness
+    every profile carries (discovery, the memory contract, transport),
+    with role-aware depth for the handoff registry — then the `## Vault`
+    umbrella with lean `###` subsections (06-growth-design §3.1). Every
+    bullet names a tool or a reference — never prose instruction.
+    Contributor and combined carry the convention sections and the
+    manifest; the manifest starts empty-but-directed and the growth
     protocol (P5c) appends entries. A manager SOUL carries NO conventions
     sections and NO manifest add-marker — that marker's absence is what
     makes growth subcommands refuse to touch manager SOULs (conventions are
@@ -235,23 +239,26 @@ def _soul_block(role: str) -> str:
         "file when a user preference about writing rules lands (read via "
         "`obsidian_conventions`; writes are grant-gated).\n"
     )
-    # Inter-agent communication — universal awareness, role-aware depth.
-    # Communication is a Hermes capability (`hermes -p X -z` via the
-    # terminal tool), not a vault one; the SOUL is the carrier every
-    # profile sees regardless of skill loading. Contributors/combined hold
-    # the full protocol reference; the manager carries the essentials
-    # inline (no contributor file in the manager skill — no dangling
-    # pointer). Discovery first: every profile must know how to find peers
-    # without any profile name hardcoded in shipped files (2026-08-07).
-    discovery = (
-        "- Peer discovery: `hermes profile list`, `--role list` "
-        "(roles.yaml) — who exists, who holds which grants; keep the "
-        "peer/role list in memory current, refresh when roles change.\n"
-    )
-    comms = {
+    # Inter-agent awareness — universal, role-aware depth. Communication is
+    # a Hermes capability (`hermes -p X -z` via the terminal tool), not a
+    # vault one; the SOUL is the carrier every profile sees regardless of
+    # skill loading. Discovery covers EVERY profile (`hermes profile list`,
+    # vault-bound or not) plus domains for those that own one (`--role
+    # list` / roles.yaml) — no profile name is ever hardcoded in shipped
+    # files. The memory contract (verify at session start, keep current,
+    # never erase) pairs with the installer's universal memory seed
+    # (`ensure_peer_memory`). Contributors/combined hold the full protocol
+    # reference; the manager carries the essentials inline (no contributor
+    # file in the manager skill — no dangling pointer) (2026-08-07).
+    awareness = {
         "contributor": (
-            "### Inter-agent communication\n"
-            f"{discovery}"
+            "## Inter-agent awareness\n"
+            "- Peer discovery: `hermes profile list` (every profile — "
+            "vault-bound or not), `--role list` (roles.yaml) — domain + "
+            "grants for those that own one.\n"
+            "- Memory: keep the peer/role list current — verify at session "
+            "start with the discovery calls; the note is essential, never "
+            "erase it.\n"
             "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
             "the terminal tool — one at a time, blocks until the peer's "
             "final message returns.\n"
@@ -259,8 +266,13 @@ def _soul_block(role: str) -> str:
             "`obsidian_protocol` — see `references/inter-agent-protocol.md`.\n"
         ),
         "manager": (
-            "### Inter-agent communication\n"
-            f"{discovery}"
+            "## Inter-agent awareness\n"
+            "- Peer discovery: `hermes profile list` (every profile — "
+            "vault-bound or not), `--role list` (roles.yaml) — domain + "
+            "grants for those that own one.\n"
+            "- Memory: keep the peer/role list current — verify at session "
+            "start with the discovery calls; the note is essential, never "
+            "erase it.\n"
             "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
             "the terminal tool — task + intent + expected response form; "
             "one at a time, blocks until the peer's final message returns.\n"
@@ -268,8 +280,13 @@ def _soul_block(role: str) -> str:
             "— parties update their own handoffs (growth-protocol.md).\n"
         ),
         "combined": (
-            "### Inter-agent communication\n"
-            f"{discovery}"
+            "## Inter-agent awareness\n"
+            "- Peer discovery: `hermes profile list` (every profile — "
+            "vault-bound or not), `--role list` (roles.yaml) — domain + "
+            "grants for those that own one.\n"
+            "- Memory: keep the peer/role list current — verify at session "
+            "start with the discovery calls; the note is essential, never "
+            "erase it.\n"
             "- Peer requests: `hermes -p <profile> -z \"<request>\"` through "
             "the terminal tool — one at a time, blocks until the peer's "
             "final message returns.\n"
@@ -281,23 +298,23 @@ def _soul_block(role: str) -> str:
     if role == "manager":
         return (
             f"{SOUL_ANCHOR}\n"
+            f"{awareness[role]}"
             "## Vault\n"
             "- Operating this vault — tools, issues, and maintenance. "
             "Each subsection points at what governs it.\n"
             "### Vault operations\n"
             f"{ops[role]}"
             f"{issues[role]}"
-            f"{comms[role]}"
         )
     return (
         f"{SOUL_ANCHOR}\n"
+        f"{awareness[role]}"
         "## Vault\n"
         "- Operating this vault — tools, conventions, issues, and "
         "maintenance. Each subsection points at what governs it.\n"
         "### Vault operations\n"
         f"{ops[role]}"
         f"{issues[role]}"
-        f"{comms[role]}"
         f"{conventions}"
     )
 
@@ -625,6 +642,37 @@ def seed_profile_config(hermes_home: Path, name: str) -> bool:
     shutil.copy(source, target)
     print(f"[setup] config seeded for {name} (from default; review "
           f"model/memory/plugins)")
+    return True
+
+
+#: The universal peer/role memory seed (2026-08-07). True in EVERY setup:
+#: a one-agent system has no peers (the statement holds), a multi-agent
+#: system converges at first session when the agent runs the discovery
+#: calls. Never names a profile — names are user-customizable at install
+#: (`existing:NAME`) and domains grow post-install, so a pre-populated
+#: list would be wrong or stale. The SOUL's `## Inter-agent awareness`
+#: block carries the instruction (verify at session start, keep current,
+#: never erase); this note is the fact that converges.
+PEER_MEMORY_SEED = (
+    "Peers and roles: none available yet — discover with `hermes profile "
+    "list` / `--role list` (roles.yaml) at session start; keep this note "
+    "current (essential, never erase)."
+)
+
+
+def ensure_peer_memory(hermes_home: Path, name: str) -> bool:
+    """Seed a profile's peer/role memory note (copy-if-missing).
+
+    Writes ``PEER_MEMORY_SEED`` into ``<profile>/memories/MEMORY.md`` on
+    first install only. Copy-if-missing like `seed_profile_config`: an
+    existing note is the agent's maintained fact — never clobber it.
+    Returns True if the note was written.
+    """
+    mem_file = profile_home(hermes_home, name) / "memories" / "MEMORY.md"
+    if mem_file.is_file():
+        return False
+    mem_file.parent.mkdir(parents=True, exist_ok=True)
+    mem_file.write_text(PEER_MEMORY_SEED + "\n", encoding="utf-8")
     return True
 
 
@@ -1465,10 +1513,13 @@ def _domain_owned_globs(roles_path: Path, profile: str,
 
 
 def remove_soul_sections(soul_path: Path) -> bool:
-    """Remove the anchored ``## Vault`` block from a profile SOUL.
+    """Remove the anchored managed block from a profile SOUL.
 
-    The block starts at the vault-soul anchor comment and ends at the next
-    level-1 heading (or EOF); a preceding blank separator is collapsed.
+    The managed region starts at the vault-soul anchor comment and spans
+    TWO top-level sections (2026-08-07): `## Inter-agent awareness` then
+    the `## Vault` umbrella — the Vault umbrella is always the block's
+    last `##` section. The block ends at the next level-1 heading after
+    it (user content) or EOF; a preceding blank separator is collapsed.
     A full role SOUL (P8.1) whose remaining prose is exactly a shipped
     template — engine-written, zero user intent — is restored to
     ``DEFAULT_SOUL_MD`` (the pre-bind seed) instead of being left as a
@@ -1483,16 +1534,18 @@ def remove_soul_sections(soul_path: Path) -> bool:
     if idx == -1:
         return False
     line_start = text.rfind("\n", 0, idx) + 1
-    rest = text[line_start:]
-    # skip the anchor line, then the block's own `## Vault` heading; the
-    # block ends at the NEXT level-1 heading (or EOF).
-    after_anchor = rest[rest.find("\n") + 1:]
-    m1 = _re.search(r"(?m)^## [^#]", after_anchor)
+    after_anchor = text.find("\n", idx) + 1  # first char past the anchor line
+    vault_pos = text.find("## Vault", after_anchor)
+    if vault_pos == -1:
+        # Corrupted/mismatched block — refuse rather than half-remove.
+        return False
+    # The block's own `## Vault` closes the managed region; anything after
+    # it that is another level-1 heading is user content.
+    vault_line_end = text.find("\n", vault_pos) + 1
+    m = _re.search(r"(?m)^## [^#]", text[vault_line_end:])
     end = len(text)
-    if m1:
-        m2 = _re.search(r"(?m)^## [^#]", after_anchor[m1.end():])
-        if m2:
-            end = line_start + (rest.find("\n") + 1) + m1.end() + m2.start()
+    if m:
+        end = vault_line_end + m.start()
     head = text[:line_start]
     if head.endswith("\n\n"):
         head = head[:-1]
@@ -1711,6 +1764,7 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
                 "manager" if (manager_role and created) else "")
         ensure_soul_sections(prof_home / "SOUL.md", skill_role,
                              profile_name=profile, identity=identity)
+        ensure_peer_memory(hermes_home, profile)
         seed_profile_config(hermes_home, profile)
         enable_plugin_for_profile(hermes_home, profile, vault_root)
     # Note c (2026-08-06): adding a domain to a profile that already has a
