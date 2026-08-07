@@ -99,12 +99,14 @@ Every subcommand supports `--dry-run`.
 
 Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·
 `scripts/roles.py` daily role verbs · `scripts/vault_ops.py` shared core ·
-`skills/note-taking/obsidian-vault/` + `skills/note-taking/
-obsidian-vault-management/` the bundled skills (base + references +
-templates) · `skills/…/references/inter-agent-protocol.md` the inter-agent
-protocol reference (ships with the contributor skill; the installer picks
-the transport variant at setup when the wiring ships) · `examples/`
-starter/blank presets · `specs/` design history
+`souls/` identity prose templates (installer data: read at setup, growth
+bind, and unbind; the manager template serves both presets — `examples/`
+holds vault presets only) · `skills/note-taking/obsidian-vault/` +
+`skills/note-taking/obsidian-vault-management/` the bundled skills (base +
+references + templates) · `skills/…/references/inter-agent-protocol.md` the
+inter-agent protocol reference (ships with the contributor skill; the
+installer picks the transport variant at setup when the wiring ships) ·
+`examples/` starter/blank presets · `specs/` design history
 (model, decisions D1–D9, install, maintenance, growth, TASKS) ·
 `reference/` external material.
 
