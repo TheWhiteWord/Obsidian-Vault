@@ -61,10 +61,9 @@ so the new tools load.
 | `standard` | Starter tree (`system/`, `work/creative/`, `work/coding/` + shared `knowledge/`), five agents granted by default | `default` (system owner), `vault-manager`, one contributor per domain, `researcher` | You want a working vault now |
 | `blank` | Bare `.vault/` (five core fields, deny-by-default roles) | `default` + `vault-manager` | You bring your own tree; add domains later |
 
-Every profile gets: the skill overlay (symlinked bundle base; real
-`conventions/` on contributor skills), role-aware SOUL.md sections, a seeded
-config, the plugin enabled, and `OBSIDIAN_VAULT_PATH` / `OBSIDIAN_VAULT_AGENT`
-in its `.env`.
+Every profile gets: the skill overlay (symlinked bundle base), role-aware
+SOUL.md sections, a seeded config, the plugin enabled, and
+`OBSIDIAN_VAULT_PATH` / `OBSIDIAN_VAULT_AGENT` in its `.env`.
 
 One-agent setups are allowed: assign every role to a single profile (e.g.
 `default`) and it gets both skills (combined role) and unioned grants.

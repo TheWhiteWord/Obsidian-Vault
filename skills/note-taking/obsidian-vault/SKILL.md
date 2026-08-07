@@ -55,11 +55,8 @@ issues. Do **not** load for plain file operations outside a vault.
 profiles — do not modify them; a change propagates to every profile, and only a
 direct user instruction overrides this.
 
-No per-profile conventions live here anymore — conventions moved **in-tree**
-(spec 07): the vault's own `.vault/conventions.md`, optionally per scope,
-loaded via `obsidian_conventions`. An empty `conventions/` dir left over from
-older installs is an artifact of the previous model — ignore it; nothing
-maintains it.
+Conventions are **in-tree** (spec 07): the vault's own `.vault/conventions.md`,
+optionally per scope, loaded via `obsidian_conventions`.
 
 ## Writing rules
 
