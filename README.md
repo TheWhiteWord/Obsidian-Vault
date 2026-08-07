@@ -94,14 +94,17 @@ Every subcommand supports `--dry-run`.
 ## Development
 
 ```bash
-.venv-test/bin/python -m pytest tests/ -q   # the suite (360 tests)
+.venv-test/bin/python -m pytest tests/ -q   # the suite (425 tests)
 ```
 
 Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·
 `scripts/roles.py` daily role verbs · `scripts/vault_ops.py` shared core ·
 `skills/note-taking/obsidian-vault/` + `skills/note-taking/
 obsidian-vault-management/` the bundled skills (base + references +
-templates) · `examples/` starter/blank presets · `specs/` design history
+templates) · `bundles/transports/` the inter-agent protocol variant
+templates (native today; the installer symlinks one as the profile's
+`references/inter-agent-protocol.md` when the wiring ships) · `examples/`
+starter/blank presets · `specs/` design history
 (model, decisions D1–D9, install, maintenance, growth, TASKS) ·
 `reference/` external material.
 

@@ -121,6 +121,14 @@ python3 scripts/roles.py --vault /path/to/vault --role list
 - `default` is unbound-able (the skill stays reachable as
   `plugin:obsidian-vault`) — the operation warns.
 
+**Inter-agent handoffs are not touched by these verbs.** The protocol
+registry (`.state/protocols/`) is parties-owned (spec 09): growth verbs
+change grants, never party contracts — that would be a third party rewriting
+them. When a profile or domain changes, the **remaining party** updates any
+affected handoff via `obsidian_protocol` (update mode, parties-only gate).
+Check `obsidian_protocol_list` after unbind/transfer/rename and tell the
+parties what changed.
+
 ## Renames and relocation
 
 There is no rename verb — a domain rename is `unbind` + `bind`:

@@ -228,3 +228,25 @@ needs it).
 4. E2E probe extension (fresh-machine): registry dir exists and is empty;
    `obsidian_protocol_list` returns empty; non-party register refused. The
    protocol-file-presence assertion waits for the installer wiring (A-9).
+
+---
+
+## §8 Growth-verb interaction (Phase 4 check, 2026-08-07)
+
+**Decision: known gap + manual step — no engine coupling.**
+
+`role_unbind` / `role_transfer` / domain rename (`unbind --domain` + `bind
+--domain`) mutate grants, SOUL, skills, env — they never touch
+`.state/protocols/`. That is deliberate, not an oversight: a growth verb
+rewriting party contracts would be a third party in the middle, which A-7
+forbids. Handoff records are parties-owned; when a profile or domain
+changes, the **remaining party** updates the affected handoff via
+`obsidian_protocol` (update mode, parties-only gate). The manager's
+growth-protocol reference carries the pointer ("check
+`obsidian_protocol_list` after unbind/transfer/rename").
+
+Why no update verb now: the registry starts empty (A-8), so there is nothing
+to migrate; the parties-only update path already exists and is the correct
+owner. A growth-verb → registry coupling would be speculative machinery for
+a registry with no records. Revisit only if records prove sticky in
+practice.
