@@ -59,6 +59,12 @@ STATE_PATH_KEY = "state"
 #: state dir via ``paths.state``, but the ledger's home within it is fixed.
 ISSUES_DIRNAME = "issues"
 
+#: Sub-directory of the state dir holding the protocol registry (spec 09).
+#: Handoffs are *structured records with parties*, not notes — engine
+#: machinery like the issue ledger. Same residency rule: fixed within the
+#: state dir, which itself may be relocated via ``paths.state``.
+PROTOCOLS_DIRNAME = "protocols"
+
 #: Filename of the per-scope conventions file inside `.vault/` (P7). Scope
 #: directives are policy prose — engine-reserved like config.yaml; only the
 #: concept is owned, the content is the scope owner's.

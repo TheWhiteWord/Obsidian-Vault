@@ -51,6 +51,8 @@ EXPECTED_TOOLS = {
     "obsidian_issue",
     "obsidian_issue_resolve",
     "obsidian_issue_list",
+    "obsidian_protocol_list",
+    "obsidian_protocol",
     "obsidian_maintain",
 }
 

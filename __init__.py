@@ -350,6 +350,53 @@ def _scope_readable(roles, agent: str, target: str) -> bool:
     return False
 
 
+def _handle_protocol_list(args, **kw) -> str:
+    def run(a, vault_root, agent, roles):
+        from vault import protocols
+        from vault.grants import RolesError
+
+        # Read is grant-free for any REGISTERED agent — the same
+        # deny-by-default floor as issue raising: an identity that does
+        # not exist in roles.yaml gets nothing.
+        try:
+            roles.get(agent)
+        except RolesError:
+            raise
+
+        return protocols.list_protocols(
+            vault_root, agent, peer=a.get("peer"))
+    return _dispatch(run, args, needs_roles=True)
+
+
+def _handle_protocol(args, **kw) -> str:
+    def run(a, vault_root, agent, roles):
+        from vault import protocols
+        from vault.grants import RolesError
+
+        try:
+            roles.get(agent)
+        except RolesError:
+            raise
+
+        if a.get("register") is not None:
+            return protocols.register_protocol(
+                vault_root, agent, a["register"],
+                confirm=bool(a.get("confirm", False)))
+        if a.get("update") is not None:
+            return protocols.update_protocol(
+                vault_root, agent, a["name"], a["update"],
+                confirm=bool(a.get("confirm", False)))
+        name = a.get("name")
+        if not name:
+            return {"ok": False, "error": "bad_request",
+                    "message": "read mode needs 'name'"}
+        record = protocols.get_protocol(vault_root, name)
+        if record is None:
+            return {"ok": False, "error": "not_found", "name": name}
+        return {"ok": True, "protocol": record}
+    return _dispatch(run, args, needs_roles=True)
+
+
 def _handle_maintain(args, **kw) -> str:
     def run(a, vault_root, agent, roles):
         from vault.maintain import run_maintenance
@@ -420,6 +467,10 @@ def register(ctx) -> None:
                                    _handle_issue_resolve, "✅"),
         "obsidian_issue_list":    (schemas.OBSIDIAN_ISSUE_LIST,
                                    _handle_issue_list, "🗒️"),
+        "obsidian_protocol_list": (schemas.OBSIDIAN_PROTOCOL_LIST,
+                                   _handle_protocol_list, "🔁"),
+        "obsidian_protocol":      (schemas.OBSIDIAN_PROTOCOL,
+                                   _handle_protocol, "🤝"),
         "obsidian_maintain":      (schemas.OBSIDIAN_MAINTAIN, _handle_maintain, "🧹"),
     }
 

@@ -499,6 +499,73 @@ OBSIDIAN_CONVENTIONS: Dict[str, Any] = {
 }
 
 
+OBSIDIAN_PROTOCOL_LIST: Dict[str, Any] = {
+    "name": "obsidian_protocol_list",
+    "description": (
+        "List the inter-agent handoffs registered in the vault's protocol "
+        "registry where you are a party (requester or responder). Optional "
+        "peer=<profile> narrows to the handoffs you have with that specific "
+        "agent. Registry records live in .state/protocols/ — structured "
+        "records, not notes: no frontmatter validation, no INDEX "
+        "regeneration, invisible to search. Read is grant-free for any "
+        "registered agent; list results are party-filtered by construction."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "peer": {
+                "type": "string",
+                "description": "Narrow to handoffs between you and this profile (either direction).",
+            },
+            "agent": _AGENT_ARG,
+            "vault": _VAULT_ARG,
+        },
+        "required": [],
+    },
+}
+
+
+OBSIDIAN_PROTOCOL: Dict[str, Any] = {
+    "name": "obsidian_protocol",
+    "description": (
+        "Read, register, or update one inter-agent handoff in the vault's "
+        "protocol registry. Read mode (pass name): the full record — both "
+        "sides' instructions. Register mode (pass register with a record): "
+        "create a new handoff; you must be one of the sides. Update mode "
+        "(pass name + update with a record): replace an existing handoff; "
+        "you must be a party of the existing record. Records carry "
+        "requester/responder profiles + domains, request/response formats, "
+        "and instructions. Pass confirm=true to apply; without it the call "
+        "validates and gates and returns the would-be record (propose mode)."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Read mode: the handoff's name to load. Update mode: the existing handoff's name.",
+            },
+            "register": {
+                "type": "object",
+                "description": "Register mode: the new handoff record {name, requester: {profiles, domains?}, responder: {profiles, domains?}, request_format, response_format, instructions}.",
+            },
+            "update": {
+                "type": "object",
+                "description": "Update mode: the replacement record (same shape as register).",
+            },
+            "confirm": {
+                "type": "boolean",
+                "description": "Apply the write. Default false (propose only).",
+                "default": False,
+            },
+            "agent": _AGENT_ARG,
+            "vault": _VAULT_ARG,
+        },
+        "required": [],
+    },
+}
+
+
 ALL_SCHEMAS: List[Dict[str, Any]] = [
     OBSIDIAN_CONTEXT,
     OBSIDIAN_WRITE,
@@ -515,5 +582,7 @@ ALL_SCHEMAS: List[Dict[str, Any]] = [
     OBSIDIAN_ISSUE,
     OBSIDIAN_ISSUE_RESOLVE,
     OBSIDIAN_ISSUE_LIST,
+    OBSIDIAN_PROTOCOL_LIST,
+    OBSIDIAN_PROTOCOL,
     OBSIDIAN_MAINTAIN,
 ]
