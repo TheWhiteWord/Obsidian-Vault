@@ -437,8 +437,7 @@ def profile_home(hermes_home: Path, name: str) -> Path:
 #: a profile holds: a contributor gets the authoring skill, a manager gets the
 #: management skill, a one-profile setup (combined) gets both. Conventions
 #: moved in-tree (P7): the vault's conventions live at `.vault/conventions.md`
-#: (`ensure_root_conventions`), never in the skill — no `conventions/` dir is
-#: created or maintained in a profile's skill surface.
+#: (`ensure_root_conventions`) — the skill surface carries no conventions dir.
 ROLE_SKILLS = {
     "contributor": ["obsidian-vault"],
     "manager": ["obsidian-vault-management"],
@@ -457,12 +456,6 @@ def install_skills(profile_skills: Path, role: str) -> list[Path]:
     `note-taking/obsidian-vault-management`, a one-profile setup gets both
     (2026-08-05 skill split). `SKILL.md`, `references/` and `templates/`
     become symlinks to each bundle — the immutable base, update-
-    propagating, never rewritten.
-
-    Conventions live in-tree since P7 (`.vault/conventions.md`); a legacy
-    empty `conventions/` dir from a pre-P7 install is pruned when empty.
-    Real content there is copy-on-write — preserved.
-
     Role alignment is symmetric at the skill level: a skill the role no
     longer holds loses its bundle-derived surface (the symlinks). Real
     content — copy-on-write customisations — is preserved (the survival
@@ -485,12 +478,6 @@ def install_skills(profile_skills: Path, role: str) -> list[Path]:
         _ensure_symlink(target / "SKILL.md", bundle / "SKILL.md")
         for sub in ("references", "templates"):
             _ensure_symlink(target / sub, bundle / sub)
-        # P7: conventions are in-tree — prune a legacy EMPTY conventions/
-        # dir (install_skills created one pre-P7; nothing writes there now).
-        # Non-empty = user copy-on-write content: preserved.
-        conv_dir = target / "conventions"
-        if conv_dir.is_dir() and not any(conv_dir.iterdir()):
-            conv_dir.rmdir()
         targets.append(target)
 
     skills_root = profile_skills / "note-taking"
@@ -1682,11 +1669,6 @@ def uninstall_skills(profile_skills: Path, vault_root: Path) -> None:
             link = target / sub
             if link.is_symlink():
                 link.unlink()
-        # install_skills creates an EMPTY conventions/ dir (P5c); prune it
-        # when empty. Real content there is copy-on-write — preserved.
-        conv_dir = target / "conventions"
-        if conv_dir.is_dir() and not any(conv_dir.iterdir()):
-            conv_dir.rmdir()
         if not any(target.iterdir()):
             target.rmdir()
     root = profile_skills / "note-taking"

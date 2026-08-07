@@ -81,7 +81,7 @@ def test_install_skills_combined_installs_both(tmp_path):
 
 def test_install_skills_no_conventions_dir(tmp_path):
     """P7: conventions live in-tree (`.vault/conventions.md`) — install_skills
-    no longer creates a `conventions/` dir in either skill (2026-08-07)."""
+    never creates a `conventions/` dir in either skill (2026-08-07)."""
     contrib = installer.install_skills(tmp_path, role="contributor")[0]
     assert not (contrib / "conventions").exists()
 
@@ -91,31 +91,6 @@ def test_install_skills_no_conventions_dir(tmp_path):
     both = installer.install_skills(tmp_path / "both", role="combined")
     for t in both:
         assert not (t / "conventions").exists()
-
-
-def test_install_skills_prunes_legacy_empty_conventions(tmp_path):
-    """A legacy EMPTY conventions/ dir from a pre-P7 install is pruned by
-    re-install — nothing writes there anymore (2026-08-07)."""
-    contrib = installer.install_skills(tmp_path, role="contributor")[0]
-    conv = contrib / "conventions"
-    conv.mkdir()  # simulate the pre-P7 empty dir
-
-    installer.install_skills(tmp_path, role="contributor")  # re-run
-
-    assert not conv.exists()
-
-
-def test_install_skills_keeps_nonempty_conventions(tmp_path):
-    """Real copy-on-write content in conventions/ is user content — the
-    survival guarantee keeps it even though the dir is no longer created."""
-    target = installer.install_skills(tmp_path, role="contributor")[0]
-    planted = target / "conventions" / "TWW-conventions.md"
-    planted.parent.mkdir(parents=True, exist_ok=True)
-    planted.write_text("# my accumulated conventions\n", encoding="utf-8")
-
-    installer.install_skills(tmp_path, role="contributor")  # re-run
-
-    assert planted.read_text(encoding="utf-8") == "# my accumulated conventions\n"
 
 
 def test_install_skills_never_touches_bundled(tmp_path):
@@ -167,19 +142,18 @@ def test_install_skills_role_alignment_drops_other_skill(tmp_path):
     assert mgr.joinpath("SKILL.md").is_symlink()
 
 
-def test_install_skills_alignment_preserves_conventions(tmp_path):
-    """Role alignment never deletes the maintained conventions file: real
-    copy-on-write content in the contributor skill's conventions/ survives
-    a manager transition (the survival guarantee; P7 keeps conventions
-    in-tree, but legacy planted files are user content)."""
+def test_install_skills_alignment_preserves_cow_dir(tmp_path):
+    """Role alignment never deletes user content: a real copy-on-write dir in
+    the contributor skill's surface survives a manager transition (the
+    survival guarantee — alignment only unlinks symlink surfaces)."""
     installer.install_skills(tmp_path, role="contributor")
-    conv = tmp_path / "note-taking" / "obsidian-vault" / "conventions"
-    conv.mkdir(parents=True)  # legacy copy-on-write dir
-    (conv / "TWW-conventions.md").write_text("# rules\n", encoding="utf-8")
+    cow = tmp_path / "note-taking" / "obsidian-vault" / "custom"
+    cow.mkdir(parents=True)
+    (cow / "notes.md").write_text("# mine\n", encoding="utf-8")
 
     installer.install_skills(tmp_path, role="manager")
 
-    assert (conv / "TWW-conventions.md").read_text(encoding="utf-8") == "# rules\n"
+    assert (cow / "notes.md").read_text(encoding="utf-8") == "# mine\n"
 
 
 # --- profile_home -----------------------------------------------------------
