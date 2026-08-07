@@ -49,8 +49,10 @@ protocols — lands here, in the convention + registry layers.
 - **Two tools** — `obsidian_protocol_list`, `obsidian_protocol`
   (read / register / update), registered in `__init__.py` with schemas in
   `vault/schemas.py`.
-- **`bundles/transports/native.md`** — the canonical protocol file content
-  (reproduced in §5; becomes the shipped file).
+- **`skills/note-taking/obsidian-vault/references/inter-agent-protocol.md`**
+  — the canonical protocol file content (reproduced in §5; ships with the
+  contributor skill — a reference file, installed by the existing skill
+  overlay, no separate bundle).
 - **Tests** — `tests/test_protocols.py` + entrypoint wiring assertion.
 - **Specs** — this file + `TASKS-inter-agent.md`; the DESK drafts stay
   out-of-repo until this phase stabilises, then the spec is the record.
@@ -121,8 +123,11 @@ docstring, not a separate doc — the `vault/issues.py` precedent.
 
 ## §5 The protocol file — native variant (canonical content)
 
-`bundles/transports/native.md` — the whole file that becomes
-`references/inter-agent-protocol.md` when the wiring ships (A-9). Shared
+The canonical file is `skills/note-taking/obsidian-vault/references/
+inter-agent-protocol.md` — a plain reference file shipping with the
+contributor skill (installed by the existing skill overlay; no separate
+bundle). A second transport variant would be a separate reference file the
+installer picks at setup (copy-on-write, 06-growth-design §2.3). Shared
 (non-transport) sections must stay byte-identical across variants — a repo
 test asserts this once a second variant exists.
 

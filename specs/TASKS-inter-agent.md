@@ -2,7 +2,8 @@
 
 Goal: ship the inter-agent communication layer — the registry engine
 (`vault/protocols.py`), two tools, and the canonical protocol file
-(`bundles/transports/native.md`) — per `specs/09-inter-agent-protocol.md`.
+(`skills/note-taking/obsidian-vault/references/inter-agent-protocol.md`) —
+per `specs/09-inter-agent-protocol.md`.
 
 **Scope boundary (2026-08-07, Davide):** installer/skill wiring, setup
 transport question, kanban variant, registry seeding, and skill reference
@@ -30,8 +31,11 @@ they land later without touching protocol content.
   construction) — the issues-ledger model, not `.vault/` prose.
 - **Write gate:** parties only, engine-enforced; delete is out of scope this
   phase.
-- **File name for the canonical protocol:** `bundles/transports/native.md`
-  (the whole-file variant; the future `kanban.md` sits beside it).
+- **File name for the canonical protocol:**
+  `skills/note-taking/obsidian-vault/references/inter-agent-protocol.md` — a
+  plain reference file in the contributor skill (no separate bundle; the
+  whole-file variant story and the future `kanban` variant sit in the spec
+  §5, decided 2026-08-07 cleanup).
 
 ## Phase 1 — engine (vault/protocols.py + tools)
 
@@ -67,8 +71,9 @@ they land later without touching protocol content.
 
 ## Phase 2 — content (the protocol file)
 
-- [x] `bundles/transports/native.md` — the canonical content from spec §5
-      (grammar + transport + handoffs pointer).
+- [x] `skills/note-taking/obsidian-vault/references/inter-agent-protocol.md`
+      — the canonical content from spec §5 (grammar + transport + handoffs
+      pointer); ships as a plain reference in the contributor skill.
 - [x] Verify the shared (non-transport) sections match the spec text
       byte-for-byte; the drift guard test is added when a second variant
       exists (noted, not built).
@@ -106,7 +111,9 @@ silently break what exists.
       `growth-protocol.md` gains the handoff-not-touched-by-growth-verbs
       pointer (the runnable manual step).
 - [x] **READMEs current.** Repo README: stale suite count fixed (360 → 425),
-      layout gains `bundles/transports/`. `examples/starter-vault/README.md`
+      layout gains the protocol reference (in the contributor skill, no
+      `bundles/` — cleanup decision 2026-08-07).
+      `examples/starter-vault/README.md`
       + `examples/blank-vault/README.md` (user-facing): unchanged — the
       inter-agent protocol is invisible to users (they ask the researcher;
       the protocol is how agents talk), so capability routing stays as is.

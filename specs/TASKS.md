@@ -799,8 +799,10 @@ structured records, parties-only write).
   propose-then-confirm.
 - ☑ Tools: `obsidian_protocol_list` + `obsidian_protocol` (read/register/
   update), schemas + registration + `plugin.yaml` + entrypoint test.
-- ☑ Canonical protocol file: `bundles/transports/native.md` (grammar +
-  transport; the whole-file variant the installer will symlink later).
+- ☑ Canonical protocol file:
+  `skills/note-taking/obsidian-vault/references/inter-agent-protocol.md`
+  (grammar + transport; a plain reference shipping with the contributor
+  skill — no separate bundle, decided 2026-08-07 cleanup).
 - ☑ Tests: 29 new (425 green) — validation, adversarial parties-gate matrix,
   party-filtered list, no-pollution, tool surface.
 - ☐ Installer/skill wiring, setup transport question, kanban variant, registry

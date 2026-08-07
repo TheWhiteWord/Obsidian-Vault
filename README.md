@@ -101,9 +101,9 @@ Layout: `vault/` engine modules · `scripts/setup.py` setup questionnaire ·
 `scripts/roles.py` daily role verbs · `scripts/vault_ops.py` shared core ·
 `skills/note-taking/obsidian-vault/` + `skills/note-taking/
 obsidian-vault-management/` the bundled skills (base + references +
-templates) · `bundles/transports/` the inter-agent protocol variant
-templates (native today; the installer symlinks one as the profile's
-`references/inter-agent-protocol.md` when the wiring ships) · `examples/`
+templates) · `skills/…/references/inter-agent-protocol.md` the inter-agent
+protocol reference (ships with the contributor skill; the installer picks
+the transport variant at setup when the wiring ships) · `examples/`
 starter/blank presets · `specs/` design history
 (model, decisions D1–D9, install, maintenance, growth, TASKS) ·
 `reference/` external material.
