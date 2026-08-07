@@ -79,40 +79,49 @@ def test_install_skills_combined_installs_both(tmp_path):
         assert t.joinpath("SKILL.md").is_symlink()
 
 
-def test_install_skills_conventions_dir(tmp_path):
-    """Only the contributor skill carries a real conventions/ dir — the
-    maintained file's home. The manager skill has none (2026-08-05)."""
+def test_install_skills_no_conventions_dir(tmp_path):
+    """P7: conventions live in-tree (`.vault/conventions.md`) — install_skills
+    no longer creates a `conventions/` dir in either skill (2026-08-07)."""
     contrib = installer.install_skills(tmp_path, role="contributor")[0]
-    conv = contrib / "conventions"
-    assert conv.is_dir() and not conv.is_symlink()
+    assert not (contrib / "conventions").exists()
 
     mgr = installer.install_skills(tmp_path / "mgr", role="manager")[0]
     assert not (mgr / "conventions").exists()
 
     both = installer.install_skills(tmp_path / "both", role="combined")
-    contrib2 = next(t for t in both if t.name == "obsidian-vault")
-    mgr2 = next(t for t in both if t.name == "obsidian-vault-management")
-    assert (contrib2 / "conventions").is_dir()
-    assert not (mgr2 / "conventions").exists()
+    for t in both:
+        assert not (t / "conventions").exists()
+
+
+def test_install_skills_prunes_legacy_empty_conventions(tmp_path):
+    """A legacy EMPTY conventions/ dir from a pre-P7 install is pruned by
+    re-install — nothing writes there anymore (2026-08-07)."""
+    contrib = installer.install_skills(tmp_path, role="contributor")[0]
+    conv = contrib / "conventions"
+    conv.mkdir()  # simulate the pre-P7 empty dir
+
+    installer.install_skills(tmp_path, role="contributor")  # re-run
+
+    assert not conv.exists()
+
+
+def test_install_skills_keeps_nonempty_conventions(tmp_path):
+    """Real copy-on-write content in conventions/ is user content — the
+    survival guarantee keeps it even though the dir is no longer created."""
+    target = installer.install_skills(tmp_path, role="contributor")[0]
+    planted = target / "conventions" / "TWW-conventions.md"
+    planted.parent.mkdir(parents=True, exist_ok=True)
+    planted.write_text("# my accumulated conventions\n", encoding="utf-8")
+
+    installer.install_skills(tmp_path, role="contributor")  # re-run
+
+    assert planted.read_text(encoding="utf-8") == "# my accumulated conventions\n"
 
 
 def test_install_skills_never_touches_bundled(tmp_path):
     bundled_before = (BUNDLED / "SKILL.md").read_text(encoding="utf-8")
     installer.install_skills(tmp_path, role="contributor")
     assert (BUNDLED / "SKILL.md").read_text(encoding="utf-8") == bundled_before
-
-
-def test_maintained_conventions_survive_rerun(tmp_path):
-    """The survival regression (2026-08-04 model): the maintained file is
-    `<vault>-conventions.md` — the installer never touches it, so a planted
-    convention survives a re-install."""
-    target = installer.install_skills(tmp_path, role="contributor")[0]
-    planted = target / "conventions" / "TWW-conventions.md"
-    planted.write_text("# my accumulated conventions\n", encoding="utf-8")
-
-    installer.install_skills(tmp_path, role="contributor")  # re-run
-
-    assert planted.read_text(encoding="utf-8") == "# my accumulated conventions\n"
 
 
 def _pre_p5a_install(tmp_path: Path) -> Path:
@@ -159,10 +168,13 @@ def test_install_skills_role_alignment_drops_other_skill(tmp_path):
 
 
 def test_install_skills_alignment_preserves_conventions(tmp_path):
-    """Role alignment never deletes the maintained conventions file: the
-    contributor skill's conventions/ survives a manager transition."""
+    """Role alignment never deletes the maintained conventions file: real
+    copy-on-write content in the contributor skill's conventions/ survives
+    a manager transition (the survival guarantee; P7 keeps conventions
+    in-tree, but legacy planted files are user content)."""
     installer.install_skills(tmp_path, role="contributor")
     conv = tmp_path / "note-taking" / "obsidian-vault" / "conventions"
+    conv.mkdir(parents=True)  # legacy copy-on-write dir
     (conv / "TWW-conventions.md").write_text("# rules\n", encoding="utf-8")
 
     installer.install_skills(tmp_path, role="manager")

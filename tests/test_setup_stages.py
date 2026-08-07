@@ -282,12 +282,12 @@ class TestRunSetup:
         assert "SETUP:done" in out or "combined" in out
         # vault scaffolded
         assert (vault / ".vault" / "roles.yaml").is_file()
-        # default (combined role) got BOTH skills; conventions live on the
-        # contributor skill only
+        # default (combined role) got BOTH skills; conventions live in-tree
+        # (P7) — no `conventions/` dir is created in the skill surface
         default_contrib = (scratch_home / "skills" / "note-taking"
                            / "obsidian-vault")
         assert default_contrib.joinpath("SKILL.md").is_symlink()
-        assert (default_contrib / "conventions").is_dir()
+        assert not (default_contrib / "conventions").exists()
         default_mgr = (scratch_home / "skills" / "note-taking"
                        / "obsidian-vault-management")
         assert default_mgr.joinpath("SKILL.md").is_symlink()

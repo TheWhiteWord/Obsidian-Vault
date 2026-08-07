@@ -435,10 +435,10 @@ def profile_home(hermes_home: Path, name: str) -> Path:
 
 #: Role → skill bundles (2026-08-05 skill split). The role owns which skills
 #: a profile holds: a contributor gets the authoring skill, a manager gets the
-#: management skill, a one-profile setup (combined) gets both. The maintained,
-#: growing per-vault file is `<vault>-conventions.md`, created from the
-#: template by the growth protocol into the contributor skill's conventions/
-#: — never seeded here.
+#: management skill, a one-profile setup (combined) gets both. Conventions
+#: moved in-tree (P7): the vault's conventions live at `.vault/conventions.md`
+#: (`ensure_root_conventions`), never in the skill — no `conventions/` dir is
+#: created or maintained in a profile's skill surface.
 ROLE_SKILLS = {
     "contributor": ["obsidian-vault"],
     "manager": ["obsidian-vault-management"],
@@ -457,15 +457,16 @@ def install_skills(profile_skills: Path, role: str) -> list[Path]:
     `note-taking/obsidian-vault-management`, a one-profile setup gets both
     (2026-08-05 skill split). `SKILL.md`, `references/` and `templates/`
     become symlinks to each bundle — the immutable base, update-
-    propagating, never rewritten. The contributor skill carries a real
-    `conventions/` dir: the maintained per-vault file
-    (`<vault>-conventions.md`) is created there by the growth protocol,
-    never here.
+    propagating, never rewritten.
+
+    Conventions live in-tree since P7 (`.vault/conventions.md`); a legacy
+    empty `conventions/` dir from a pre-P7 install is pruned when empty.
+    Real content there is copy-on-write — preserved.
 
     Role alignment is symmetric at the skill level: a skill the role no
     longer holds loses its bundle-derived surface (the symlinks). Real
-    content — `conventions/` and copy-on-write customisations — is
-    preserved (the survival guarantee).
+    content — copy-on-write customisations — is preserved (the survival
+    guarantee).
 
     A profile that deliberately edited a reference or template (broke the
     symlink into a real dir, copy-on-write — 06-growth-design §2.3) is
@@ -484,8 +485,12 @@ def install_skills(profile_skills: Path, role: str) -> list[Path]:
         _ensure_symlink(target / "SKILL.md", bundle / "SKILL.md")
         for sub in ("references", "templates"):
             _ensure_symlink(target / sub, bundle / sub)
-        if name == "obsidian-vault":
-            (target / "conventions").mkdir(exist_ok=True)
+        # P7: conventions are in-tree — prune a legacy EMPTY conventions/
+        # dir (install_skills created one pre-P7; nothing writes there now).
+        # Non-empty = user copy-on-write content: preserved.
+        conv_dir = target / "conventions"
+        if conv_dir.is_dir() and not any(conv_dir.iterdir()):
+            conv_dir.rmdir()
         targets.append(target)
 
     skills_root = profile_skills / "note-taking"
