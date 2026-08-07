@@ -55,7 +55,7 @@ issues. Do **not** load for plain file operations outside a vault.
 profiles — do not modify them; a change propagates to every profile, and only a
 direct user instruction overrides this.
 
-Conventions are **in-tree** (spec 07): the vault's own `.vault/conventions.md`,
+Conventions are **in-tree**: the vault's own `.vault/conventions.md`,
 optionally per scope, loaded via `obsidian_conventions`.
 
 ## Writing rules

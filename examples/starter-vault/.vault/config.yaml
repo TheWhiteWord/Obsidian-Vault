@@ -12,7 +12,7 @@ fields:
     required: true
     multi: true
     vocabulary: true
-    allowed: [note, index, reference]   # issues live in the ledger (spec 05), not as notes
+    allowed: [note, index, reference]   # issues live in the ledger, not as notes
   status:
     required: true
     allowed: [draft, active, paused, completed, reference]

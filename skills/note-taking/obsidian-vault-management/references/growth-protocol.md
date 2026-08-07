@@ -32,7 +32,7 @@ the traps are at the bottom.
 | `--role bind --domain` (owner-side trees) | domain owner | `write` on the parent tree |
 
 The manager creates contributors and domains but never authors content.
-Role mutations (06-growth-design §4.5): `bind` attaches, `unbind` detaches
+Role mutations: `bind` attaches, `unbind` detaches
 (refuses for the manager — transfer instead), `transfer` hands a role or
 domain off, `list` inspects.
 
@@ -55,7 +55,7 @@ Creates `work/DOMAIN/` + `.vault/config.yaml` (from `--config`, or a minimal
 stub) when missing, appends the owner's grant block to `roles.yaml`
 (`write`/`config`/`meta` on `work/DOMAIN/**` — `meta` is the backstop grant,
 P7 — plus `read`, and the shared `work/*/knowledge/**` read). Conventions
-live in-tree (spec 07): nothing is seeded or registered in a SOUL. On an
+live in-tree: nothing is seeded or registered in a SOUL. On an
 already-scaffolded tree it grants only.
 
 `--domain` takes a path, so a **subdomain** binds too (`--domain
@@ -122,7 +122,7 @@ python3 scripts/roles.py --vault /path/to/vault --role list
   `plugin:obsidian-vault`) — the operation warns.
 
 **Inter-agent handoffs are not touched by these verbs.** The protocol
-registry (`.state/protocols/`) is parties-owned (spec 09): growth verbs
+registry (`.state/protocols/`) is parties-owned: growth verbs
 change grants, never party contracts — that would be a third party rewriting
 them. When a profile or domain changes, the **remaining party** updates any
 affected handoff via `obsidian_protocol` (update mode, parties-only gate).
@@ -156,7 +156,7 @@ domain is unowned and nobody can write to it.
   disconnects all agents, and the ledger lives inside the vault so nothing
   can see the break. Recovery = re-run the setup questionnaire at the new
   location — not `--role`.
-- **Conventions are in-tree (spec 07), so they follow the folder.** The
+- **Conventions are in-tree, so they follow the folder.** The
   root `.vault/conventions.md`, or the scope's own — a rename moves them
   with the tree; nothing re-registers.
 

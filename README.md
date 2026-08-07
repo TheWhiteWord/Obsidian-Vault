@@ -125,10 +125,10 @@ holds vault presets only) · `skills/note-taking/obsidian-vault/` +
 references + templates) · `skills/…/references/inter-agent-protocol.md` the
 inter-agent protocol reference (ships with the contributor skill; the
 installer picks the transport variant at setup when the wiring ships) ·
-`examples/` starter/blank presets · `specs/` design history
-(model, decisions D1–D9, install, maintenance, growth, TASKS) ·
-`docs/` full documentation (concepts, guides, tool reference,
-development) — start at `docs/index.md`.
+`examples/` starter/blank presets · `docs/` full documentation
+(concepts, guides, tool reference, development) — start at
+`docs/index.md`; the settled design decisions (D1–D9) live in
+`docs/decisions.md`.
 
 **Rule:** anything used by more than one module goes in `vault/constants.py`
 or `vault/paths.py`. The entrypoint holds tool schemas and dispatch only.

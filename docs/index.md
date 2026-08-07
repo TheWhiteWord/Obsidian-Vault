@@ -83,11 +83,11 @@ deterministically. Full walkthrough: [installation.md](installation.md).
 
 ## How this relates to the rest of the repo
 
-- **`specs/`** is the design history — the model spec, the settled
-  decisions (D1–D9), and the phase trackers. It records *why things are
-  the way they are*; this documentation describes *what exists now*.
-  Where a current behavior needs its rationale, the docs give one line
-  and leave the full record in the specs.
+- **`docs/decisions.md`** is the settled-decisions ledger (D1–D9) —
+  the record of *why things are the way they are*; this documentation
+  describes *what exists now*. Where a current behavior needs its
+  rationale, the docs give one line and the ledger holds the full
+  record.
 - **`skills/`** holds the agent-facing procedures (the contributor's
   writing loop, the manager's maintenance judgment). Those documents
   tell an agent *how to do its job*; these docs tell a reader *how the

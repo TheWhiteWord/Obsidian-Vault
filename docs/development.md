@@ -20,9 +20,8 @@ installer, the bundled skills, or the test suite.
 ├── examples/
 │   ├── starter-vault/          # the standard preset (a real, working vault)
 │   └── blank-vault/            # the blank preset (bare .vault/, no domains)
-├── specs/                      # design history: model spec, decisions D1–D9, phase trackers
 ├── tests/                      # the pytest suite (434 tests)
-└── docs/                       # this documentation — describes the current state
+└── docs/                       # this documentation + the decisions ledger (docs/decisions.md)
 ```
 
 The live install is a symlink to this repo
@@ -75,15 +74,14 @@ a change that breaks one is a design review, not a code review.
 ## Design discipline
 
 - **Phases that change what agents can do** (grants, new tools,
-  manager powers) are designed as a spec doc before any code — the
+  manager powers) are designed as a design doc before any code — the
   grant model is a hard constraint that shapes the solution space.
   Mechanical refactors with a green suite as the safety net need no
   tracker.
-- **Specs are the record.** `specs/` holds the model spec, the settled
-  decisions (D1–D9), and the phase trackers. When a behavior changes,
-  update this documentation (the current state) and the relevant spec
-  tracker; the design decision itself is amended, never rewritten in
-  place.
+- **Decisions are the record.** `docs/decisions.md` holds the settled
+  decisions (D1–D9), append-only. When a behavior changes, update this
+  documentation (the current state) and record the decision there; a
+  decision is amended by a new entry, never rewritten in place.
 
 ## Verification loops
 
