@@ -9,3 +9,7 @@ __pycache__/
 # Editor
 .vscode/
 .idea/
+
+# Local research material (Obsidian API notes, soul research) —
+# development input, not shipped with the plugin.
+reference/
