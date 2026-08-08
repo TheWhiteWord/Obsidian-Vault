@@ -88,12 +88,26 @@ root, optionally one per scope (a folder's own `.vault/conventions.md`).
 `obsidian_conventions(folder)` walks the chain — nearest file wins — so
 writing under a scope loads exactly that scope's rules.
 
+**What conventions are for:** shaping *desired writing behavior on protocols
+that already work* — style, structure, tags, format, standing preferences.
+Record them so the next session doesn't relearn them.
+
+**What conventions are not for:** patching broken behavior. If something is
+misbehaving (a tool not used, a step skipped), that is a defect to fix at its
+own level — a plugin bug, a skill gap, a ledger issue — not a convention.
+A convention on top of a broken path just documents the workaround.
+
+**Placement — who must see it?** A rule that applies to one domain goes in
+that domain's file (`<domain>/.vault/conventions.md`); a rule that applies to
+the whole vault goes in the root file. The root file is the *fallback*, not
+the default home: prefer the narrowest scope that covers every reader. When a
+folder has no scope file of its own, the chain falls back up to the root —
+that is what the root file is for.
+
 It grows through interaction:
 
 - **What goes in:** user corrections about *how to write* — style, structure,
-  tags, format — and standing preferences. Record them so the next session
-  doesn't relearn them. A scope's file stays scoped; vault-wide rules go in
-  the root file.
+  tags, format — and standing preferences.
 - **What does not:** vault content decisions (what the vault contains) — those
   live in the vault, not in conventions.
 - **Process:** propose → confirm → record. Keep the file tight; it is loaded on
