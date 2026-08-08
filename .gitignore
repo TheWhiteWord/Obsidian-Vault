@@ -12,4 +12,7 @@ __pycache__/
 
 # Local research material (Obsidian API notes, soul research) —
 # development input, not shipped with the plugin.
-reference/
+# Root-anchored: only the repo-root reference/ folder is research;
+# docs/reference/ is shipped documentation and must be tracked.
+/reference/
+specs/

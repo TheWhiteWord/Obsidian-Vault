@@ -22,16 +22,18 @@ Record fields are engine-fixed:
 |---|---|
 | `key` | deterministic dedupe key (`subject|target` slug + hash) |
 | `state` | `open` / `in_progress` / `resolved` / `declined` |
-| `kind` | `finding` (from the sweep) / `suggestion` (advisory) |
+| `nature` | `finding` (from the sweep) / `suggestion` (advisory) |
 | `priority` | `low` / `medium` / `high` / `critical` |
 | `subject`, `detail` | what is wrong |
 | `target` | the affected path, or a scope glob like `system/**` |
 | `tags` | e.g. `["maintenance"]` |
+| `assignee` | who SHOULD resolve (profile name, optional; a SHOULD signal, never a grant override) |
+| `claimed_by` | who moved the issue `open → in_progress` (the holder) |
 | `raised_by`, `created_at`, `updated_at`, `resolved_by`, `resolved_at`, `reason` | provenance + closure |
 
 Every mutation is recorded in the audit trail
-(`issue_create`, `issue_resolve`, `issue_prune`), so full history lives
-there; the ledger file holds current state only.
+(`issue_create`, `issue_claim`, `issue_resolve`, `issue_prune`), so full
+history lives there; the ledger file holds current state only.
 
 ## Access — derived from grants at call time
 
@@ -39,22 +41,26 @@ there; the ledger file holds current state only.
 |---|---|
 | **raise** | any registered agent (present in `roles.yaml`) — the escalation valve, audited |
 | **list** | the caller's `read` grants intersect the issue's `target` — "my issues" is a query, not a folder |
-| **resolve** | `write` **or** `meta` over the `target` — you close issues about notes you own |
+| **claim / resolve** | `write` **or** `meta` over the `target` — you act on issues about notes you own |
 
-There is no routing table: the issue's `target` *is* the addressee.
-The domain owner fixes its domain; the manager (`meta` on `**`) can
-resolve maintenance findings; whoever can read a target can see its
-issues.
+There is no routing table: the issue's `target` *is* the addressee, and
+the optional `assignee` is a SHOULD hint on top of it. The domain owner
+fixes its domain; the manager (`meta` on `**`) can resolve maintenance
+findings; whoever can read a target can see its issues. The assignee
+never overrides grants — a mis-assigned issue simply cannot be acted on
+by the wrong agent.
 
 ## The tools
 
 - **`obsidian_issue`** — raise one or many issues (`items:` array).
-  Duplicate keys are skipped; a closed issue with the same key is
-  re-opened.
-- **`obsidian_issue_resolve`** — close with `state: resolved |
-  declined` and an optional `reason`.
+  Optional per item: `priority`, `tags`, `key`, `assignee` (who should
+  resolve). Duplicate keys are skipped; a closed issue with the same key
+  is re-opened.
+- **`obsidian_issue_resolve`** — claim with `state: in_progress`, or
+  close with `state: resolved | declined` and an optional `reason`.
 - **`obsidian_issue_list`** — filter by `state` / `priority` / `tags` /
-  `target` / `raised_by`; results are grant-intersected.
+  `target` / `raised_by` / `assigned_to` (`me` = the calling agent);
+  results are grant-intersected.
 
 ## The maintenance sweep
 

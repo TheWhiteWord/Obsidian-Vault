@@ -213,6 +213,13 @@ def _soul_block(role: str) -> str:
             "- Raise and track ledger issues: `obsidian_issue`, "
             "`obsidian_issue_list`, `obsidian_issue_resolve`. See "
             "`references/issues.md`.\n"
+            "- Session start: run `obsidian_issue_list assigned_to=me`, "
+            "surface your assigned issues, and propose whether to handle "
+            "each now or later (ask the user when present).\n"
+            "- File issues as you find them — as a reminder to yourself "
+            "when fixing would derail the current task, or assigned to "
+            "the owning agent (`assignee`: write/meta over the target; "
+            "else unassigned for triage).\n"
         ),
         "manager": (
             "### Issues\n"
@@ -220,6 +227,12 @@ def _soul_block(role: str) -> str:
             "`obsidian_issue_list`, `obsidian_issue_resolve`, "
             "`obsidian_maintain`. See `references/issues.md`, "
             "`references/maintenance.md`.\n"
+            "- Session start: run `obsidian_issue_list assigned_to=me` "
+            "and scan the unassigned backlog; route what you can, claim "
+            "what you handle (`in_progress`).\n"
+            "- File issues as you find them — content problems to the "
+            "owning agent; structural/meta problems you may resolve "
+            "yourself (your `meta` covers every target).\n"
         ),
         "combined": (
             "### Issues\n"
@@ -227,6 +240,14 @@ def _soul_block(role: str) -> str:
             "`obsidian_issue`, `obsidian_issue_list`, "
             "`obsidian_issue_resolve`, `obsidian_maintain`. See "
             "`references/issues.md`, `references/maintenance.md`.\n"
+            "- Session start: run `obsidian_issue_list assigned_to=me` "
+            "and scan the unassigned backlog; surface what's yours and "
+            "propose now-or-later (ask the user when present); route "
+            "what you can, claim what you handle (`in_progress`).\n"
+            "- File issues as you find them — reminders to yourself when "
+            "fixing would derail the current task, content problems to "
+            "the owning agent, structural/meta problems you may resolve "
+            "yourself (your `meta` covers every target).\n"
             "- Dual role: sweep findings about your own domains are "
             "yours to fix; about other domains, raise them.\n"
         ),
