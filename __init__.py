@@ -14,7 +14,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
 if str(_PLUGIN_DIR) not in sys.path:
@@ -279,6 +279,7 @@ def _handle_issue(args, **kw) -> str:
                 target=target,
                 priority=item.get("priority", "medium"),
                 tags=item.get("tags"),
+                assignee=item.get("assignee"),
             )
             results.append(out)
         return {"issues": results}
@@ -323,6 +324,7 @@ def _handle_issue_list(args, **kw) -> str:
             tags=a.get("tags"),
             target=a.get("target"),
             raised_by=a.get("raised_by"),
+            assigned_to=_resolve_assigned_to(a.get("assigned_to"), agent),
         )
         # Grant intersection at call time: an agent sees only issues whose
         # target it can read. A scope-glob target like "system/**" is visible
@@ -348,6 +350,13 @@ def _scope_readable(roles, agent: str, target: str) -> bool:
         if path_matches(scope, target) or path_matches(target, scope):
             return True
     return False
+
+
+def _resolve_assigned_to(value, agent: str) -> Optional[str]:
+    """'me' resolves to the calling agent; anything else passes through."""
+    if value is None:
+        return None
+    return agent if value.strip().lower() == "me" else value.strip()
 
 
 def _handle_protocol_list(args, **kw) -> str:

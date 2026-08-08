@@ -324,6 +324,14 @@ OBSIDIAN_ISSUE: Dict[str, Any] = {
                         "tags": {"type": "array", "items": {"type": "string"},
                                  "description": "Optional tags, e.g. "
                                                 "['plugin', 'research']."},
+                        "assignee": {"type": "string",
+                                     "description": "Optional profile name of "
+                                                    "who SHOULD resolve this. "
+                                                    "A SHOULD signal, never a "
+                                                    "grant override — pick the "
+                                                    "agent whose write/meta "
+                                                    "covers the target (see "
+                                                    "issues.md directive)."},
                         "key": {"type": "string",
                                 "description": "Optional dedupe key. Omit to "
                                                "derive one from subject+target."},
@@ -343,10 +351,11 @@ OBSIDIAN_ISSUE: Dict[str, Any] = {
 OBSIDIAN_ISSUE_RESOLVE: Dict[str, Any] = {
     "name": "obsidian_issue_resolve",
     "description": (
-        "Close an issue on the ledger: resolved (the problem is fixed) or "
-        "declined (won't fix / not a problem). Requires the 'write' or 'meta' "
-        "grant over the issue's target — you can close issues about notes you "
-        "own. Optionally record why."
+        "Move an issue on the ledger: claim it (in_progress — records you as "
+        "the holder) or close it (resolved — the problem is fixed; declined — "
+        "won't fix / not a problem). Requires the 'write' or 'meta' grant over "
+        "the issue's target — you can act on issues about notes you own. "
+        "Optionally record why."
     ),
     "parameters": {
         "type": "object",
@@ -354,8 +363,11 @@ OBSIDIAN_ISSUE_RESOLVE: Dict[str, Any] = {
             "key": {"type": "string",
                     "description": "The issue's dedupe key, as returned by "
                                    "obsidian_issue_list."},
-            "state": {"type": "string", "enum": ["resolved", "declined"],
-                      "description": "Default resolved."},
+            "state": {"type": "string",
+                      "enum": ["in_progress", "resolved", "declined"],
+                      "description": "in_progress claims the issue (sets "
+                                     "claimed_by); resolved/declined close it. "
+                                     "Default resolved."},
             "reason": {"type": "string",
                        "description": "Optional closure reason."},
             "agent": _AGENT_ARG,
@@ -386,6 +398,10 @@ OBSIDIAN_ISSUE_LIST: Dict[str, Any] = {
                        "description": "Only issues whose target falls under "
                                       "this glob, e.g. 'work/creative/**'."},
             "raised_by": {"type": "string", "description": "Filter by raiser agent."},
+            "assigned_to": {"type": "string",
+                            "description": "Filter by assignee profile name; "
+                                           "'me' resolves to the calling "
+                                           "agent."},
             "limit": {"type": "integer", "description": "Max entries.", "default": 50},
             "agent": _AGENT_ARG,
             "vault": _VAULT_ARG,
