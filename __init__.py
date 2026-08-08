@@ -439,12 +439,12 @@ def register(ctx) -> None:
     # registration is the pre-install fallback and the immutable upstream.
     contributor_skill = _PLUGIN_DIR / "skills" / "note-taking" / "obsidian-vault"
     if contributor_skill.is_dir():
-        ctx.register_skill(name="obsidian-vault", path=str(contributor_skill))
+        ctx.register_skill(name="obsidian-vault", path=contributor_skill)
     manager_skill = (_PLUGIN_DIR / "skills" / "note-taking"
                      / "obsidian-vault-management")
     if manager_skill.is_dir():
         ctx.register_skill(name="obsidian-vault-management",
-                           path=str(manager_skill))
+                           path=manager_skill)
 
     handlers = {
         "obsidian_context":       (schemas.OBSIDIAN_CONTEXT, _handle_context, "🗂️"),
