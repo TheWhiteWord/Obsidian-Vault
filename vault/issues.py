@@ -24,6 +24,8 @@ Record shape (engine-fixed, layout-independent):
       "target": "work/creative/projects/a.md",   # path or scope glob ("system/**")
       "tags": ["maintenance"],
       "raised_by": "vault-manager",
+      "assignee": null,              # who SHOULD resolve (profile name; SHOULD signal, never a CAN gate)
+      "claimed_by": null,            # who moved open -> in_progress (the holder)
       "created_at": "...", "updated_at": "...",
       "resolved_by": null, "resolved_at": null, "reason": null
     }
@@ -150,6 +152,7 @@ def create_issue(
     nature: str = "finding",
     priority: str = "medium",
     tags: Optional[List[str]] = None,
+    assignee: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Open an issue — or skip / re-open an existing one with the same key.
 
@@ -162,6 +165,9 @@ def create_issue(
         raise IssueError(f"unknown nature {nature!r}; valid: {list(ISSUE_NATURES)}")
     if priority not in ISSUE_PRIORITIES:
         raise IssueError(f"unknown priority {priority!r}; valid: {list(ISSUE_PRIORITIES)}")
+    if assignee is not None and (not isinstance(assignee, str) or not assignee.strip()):
+        raise IssueError(f"assignee must be a non-empty profile name, got {assignee!r}")
+    clean_assignee = assignee.strip() if assignee else None
 
     root = Path(vault_root).resolve()
     path = _issue_path(root, key)
@@ -177,9 +183,11 @@ def create_issue(
 
     if existing:
         # Re-escalation: re-open the same key, keep the original created_at
-        # and raiser, clear closure fields.
+        # and raiser, keep assignee/claimed_by, clear closure fields.
         record = {**existing, "state": "open", "updated_at": now,
                   "resolved_by": None, "resolved_at": None, "reason": None}
+        if clean_assignee:
+            record["assignee"] = clean_assignee
         _atomic_write(path, record)
         audit.record(root, agent, "issue_reopen", record.get("target") or target,
                      key=key, nature=nature)
@@ -195,6 +203,8 @@ def create_issue(
         "target": target,
         "tags": clean_tags,
         "raised_by": agent,
+        "assignee": clean_assignee,
+        "claimed_by": None,
         "created_at": now,
         "updated_at": now,
         "resolved_by": None,
@@ -219,13 +229,15 @@ def resolve_issue(
     state: str = "resolved",
     reason: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Close an issue: ``resolved`` or ``declined``, with an optional reason.
+    """Move an issue: claim (``in_progress``) or close (``resolved``/``declined``).
 
     Grant enforcement (``write``/``meta`` over the target) happens in the
-    tool layer; this is the record mutation + audit.
+    tool layer; this is the record mutation + audit. ``in_progress`` records
+    the claiming agent in ``claimed_by``; closure keeps ``claimed_by`` (the
+    holder) and sets ``resolved_by``/``resolved_at``.
     """
-    if state not in ("resolved", "declined"):
-        raise IssueError(f"closure state must be resolved or declined, got {state!r}")
+    if state not in ("in_progress", "resolved", "declined"):
+        raise IssueError(f"state must be in_progress, resolved, or declined, got {state!r}")
 
     root = Path(vault_root).resolve()
     path = _issue_path(root, key)
@@ -241,11 +253,18 @@ def resolve_issue(
         return {"result": "already_closed", "key": key, "state": record["state"]}
 
     now = _now()
-    record.update(
-        state=state, updated_at=now,
-        resolved_by=agent, resolved_at=now, reason=reason,
-    )
+    if state == "in_progress":
+        record.update(state="in_progress", updated_at=now, claimed_by=agent)
+    else:
+        record.update(
+            state=state, updated_at=now,
+            resolved_by=agent, resolved_at=now, reason=reason,
+        )
     _atomic_write(path, record)
+    if state == "in_progress":
+        audit.record(root, agent, "issue_claim", record["target"],
+                     key=key, state=state)
+        return {"result": "claimed", "key": key, "state": state}
     audit.record(root, agent, "issue_resolve", record["target"],
                  key=key, state=state, reason=reason)
     return {"result": "closed", "key": key, "state": state}
@@ -260,6 +279,7 @@ def list_issues(
     tags: Optional[List[str]] = None,
     target: Optional[str] = None,
     raised_by: Optional[str] = None,
+    assigned_to: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Current state of every issue matching the filters, newest first.
 
@@ -289,6 +309,8 @@ def list_issues(
         if target and not _target_matches(target, rec.get("target", "")):
             continue
         if raised_by and rec.get("raised_by") != raised_by:
+            continue
+        if assigned_to and rec.get("assignee") != assigned_to:
             continue
         out.append(rec)
 
