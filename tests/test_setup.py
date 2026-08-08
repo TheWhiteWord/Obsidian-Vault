@@ -546,6 +546,11 @@ def test_soul_sections_contributor_has_lean_sections(tmp_path):
     # Lean pointers: tools/references, not prose instruction.
     assert "obsidian_issue" in text
     assert "references/issues.md" in text
+    # P10 (2026-08-08): the fast-track directive lives in the SOUL — find
+    # your assigned issues with assigned_to=me; direct via assignee when the
+    # owner is clear.
+    assert "assigned_to=me" in text
+    assert "direct via `assignee`" in text
     # Communication awareness is universal (SOUL carries it regardless of
     # skill loading); the contributor has the full protocol reference.
     # Peer discovery comes first: how to list peers without any hardcoded
@@ -575,6 +580,10 @@ def test_soul_sections_manager_sees_sweep_only(tmp_path):
     text = soul.read_text(encoding="utf-8")
     assert "obsidian_maintain" in text
     assert "references/maintenance.md" in text
+    # P10 (2026-08-08): the manager's SOUL carries the routing + claim line.
+    assert "assigned_to=me" in text
+    assert "Unassigned is yours to route" in text
+    assert "in_progress" in text
     # A manager is not a contributor (2026-08-05): no conventions sections,
     # no manifest, no per-vault convention maintenance.
     assert "conventions/contributor.md" not in text
@@ -602,6 +611,11 @@ def test_soul_sections_combined_dedicated_text(tmp_path):
     text = soul.read_text(encoding="utf-8")
     assert "obsidian_maintain" in text
     assert "references/issues.md" in text
+    # P10 (2026-08-08): combined carries both the contributor fast-track and
+    # the manager routing/claim line.
+    assert "assigned_to=me" in text
+    assert "unassigned is yours to route" in text
+    assert "in_progress" in text
     # Dedicated combined text: the dual role stated once, conventions kept.
     assert "Dual role" in text
     assert "obsidian_conventions" in text   # in-tree pointer (P7)

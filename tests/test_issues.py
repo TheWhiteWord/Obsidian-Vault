@@ -203,6 +203,94 @@ class TestList:
         assert len(issues.list_issues(vault_with_roles, state="resolved")) == 1
 
 
+class TestAssignment:
+    """Assignee field + claim transition (P10, 2026-08-08)."""
+
+    def _create(self, vault, key=KEY, assignee=None):
+        return issues.create_issue(
+            vault, "vault_manager",
+            key=key, subject="s", detail="d",
+            target="work/creative/projects/a.md",
+            assignee=assignee,
+        )
+
+    def test_create_without_assignee_defaults_null(self, vault_with_roles):
+        self._create(vault_with_roles)
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["assignee"] is None
+        assert rec["claimed_by"] is None
+
+    def test_create_with_assignee_stores_it(self, vault_with_roles):
+        self._create(vault_with_roles, assignee="creative")
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["assignee"] == "creative"
+
+    def test_create_rejects_blank_assignee(self, vault_with_roles):
+        with pytest.raises(issues.IssueError):
+            self._create(vault_with_roles, assignee="   ")
+        with pytest.raises(issues.IssueError):
+            self._create(vault_with_roles, assignee="")
+
+    def test_list_filter_by_assignee(self, vault_with_roles):
+        self._create(vault_with_roles, key="a|one", assignee="creative")
+        self._create(vault_with_roles, key="b|two")
+        assert [i["key"] for i in issues.list_issues(
+            vault_with_roles, assigned_to="creative")] == ["a|one"]
+        assert [i["key"] for i in issues.list_issues(
+            vault_with_roles, assigned_to="nobody")] == []
+
+    def test_claim_sets_claimed_by_not_resolved_by(self, vault_with_roles):
+        self._create(vault_with_roles)
+        out = issues.resolve_issue(vault_with_roles, "creative", KEY,
+                                   state="in_progress")
+        assert out["result"] == "claimed"
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["state"] == "in_progress"
+        assert rec["claimed_by"] == "creative"
+        assert rec["resolved_by"] is None
+        assert rec["resolved_at"] is None
+        entries = audit.read_entries(vault_with_roles, action="issue_claim")
+        assert len(entries) == 1
+
+    def test_in_progress_dedupes_as_open(self, vault_with_roles):
+        self._create(vault_with_roles)
+        issues.resolve_issue(vault_with_roles, "creative", KEY,
+                             state="in_progress")
+        out = issues.create_issue(vault_with_roles, "vault_manager",
+                                  key=KEY, subject="s", detail="d",
+                                  target="work/creative/projects/a.md")
+        assert out["result"] == "exists"
+
+    def test_close_after_claim_keeps_holder(self, vault_with_roles):
+        self._create(vault_with_roles)
+        issues.resolve_issue(vault_with_roles, "creative", KEY,
+                             state="in_progress")
+        out = issues.resolve_issue(vault_with_roles, "creative", KEY,
+                                   state="resolved", reason="done")
+        assert out["result"] == "closed"
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["state"] == "resolved"
+        assert rec["claimed_by"] == "creative"
+        assert rec["resolved_by"] == "creative"
+
+    def test_reopen_preserves_assignee_and_claimed_by(self, vault_with_roles):
+        self._create(vault_with_roles, assignee="creative")
+        issues.resolve_issue(vault_with_roles, "creative", KEY,
+                             state="in_progress")
+        issues.resolve_issue(vault_with_roles, "creative", KEY,
+                             state="resolved", reason="done")
+        reopened = issues.create_issue(
+            vault_with_roles, "vault_manager",
+            key=KEY, subject="s", detail="d",
+            target="work/creative/projects/a.md")
+        assert reopened["result"] == "reopened"
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["state"] == "open"
+        assert rec["assignee"] == "creative"
+        assert rec["claimed_by"] == "creative"
+        assert rec["resolved_by"] is None
+
+
 class TestPrune:
     def test_prune_deletes_only_old_closed(self, vault_with_roles):
         issues.create_issue(vault_with_roles, "vault_manager",

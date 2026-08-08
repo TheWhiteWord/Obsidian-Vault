@@ -49,6 +49,17 @@ class TestIssueTool:
         })
         assert [i["result"] for i in out["issues"]] == ["created", "created"]
 
+    def test_raise_with_assignee(self, vault_with_roles):
+        out = _call(plugin._handle_issue, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "items": [{"subject": "Broken link", "detail": "d",
+                       "target": "CREATIVE/PHILOSOPHY/recurrence.md",
+                       "assignee": "tww"}],
+        })
+        assert out["issues"][0]["result"] == "created"
+        recs = issues.list_issues(vault_with_roles)
+        assert recs[0]["assignee"] == "tww"
+
     def test_raise_unknown_agent_refused(self, vault_with_roles):
         out = _call(plugin._handle_issue, {
             "vault": str(vault_with_roles), "agent": "ghost",
@@ -114,6 +125,67 @@ class TestIssueTool:
             "vault": str(vault_with_roles), "agent": "system",
         })
         assert out2["count"] == 2
+
+
+    def test_claim_requires_ownership(self, vault_with_roles):
+        issues.create_issue(vault_with_roles, "tww",
+                            key="k|CREATIVE/PHILOSOPHY/recurrence.md",
+                            subject="s", detail="d",
+                            target="CREATIVE/PHILOSOPHY/recurrence.md")
+        # system holds write only on SYSTEM/** — cannot claim a CREATIVE issue
+        out = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "system",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "state": "in_progress",
+        })
+        assert out["ok"] is False
+        assert out["error"] == "permission_denied"
+        # tww owns CREATIVE/** — can claim
+        out2 = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "state": "in_progress",
+        })
+        assert out2["result"] == "claimed"
+        rec = issues.read_issue(vault_with_roles,
+                                "k|CREATIVE/PHILOSOPHY/recurrence.md")
+        assert rec["state"] == "in_progress"
+        assert rec["claimed_by"] == "tww"
+        assert rec["resolved_by"] is None
+
+    def test_assignee_does_not_override_grants(self, vault_with_roles):
+        # Issue assigned to tww but in SYSTEM/** — system (not tww) can act
+        issues.create_issue(vault_with_roles, "tww",
+                            key="k|SYSTEM/HANDBOOK/design.md",
+                            subject="s", detail="d",
+                            target="SYSTEM/HANDBOOK/design.md",
+                            assignee="tww")
+        out = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "key": "k|SYSTEM/HANDBOOK/design.md",
+            "state": "in_progress",
+        })
+        # assignee is a SHOULD signal, never a CAN override
+        assert out["ok"] is False
+        assert out["error"] == "permission_denied"
+
+    def test_list_assigned_to_me(self, vault_with_roles):
+        issues.create_issue(vault_with_roles, "vault_manager",
+                            key="a|CREATIVE/PHILOSOPHY/recurrence.md",
+                            subject="s", detail="d",
+                            target="CREATIVE/PHILOSOPHY/recurrence.md",
+                            assignee="tww")
+        issues.create_issue(vault_with_roles, "vault_manager",
+                            key="b|SYSTEM/HANDBOOK/design.md",
+                            subject="s", detail="d",
+                            target="SYSTEM/HANDBOOK/design.md",
+                            assignee="system")
+        out = _call(plugin._handle_issue_list, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "assigned_to": "me",
+        })
+        assert out["count"] == 1
+        assert out["issues"][0]["key"] == "a|CREATIVE/PHILOSOPHY/recurrence.md"
 
 
 class TestMaintainTool:
