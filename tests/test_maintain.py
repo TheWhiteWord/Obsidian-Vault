@@ -478,3 +478,65 @@ class TestFindingsPruning:
         assert out["findings_file"] is None
         assert "findings_pruned" not in out
         assert self._names(d) == ["20260804-101010.jsonl"]
+
+
+class TestAutoAssign:
+    """Sweep findings must be auto-assigned to the owning domain agent."""
+
+    def test_distribute_routes_to_derived_owner(self, vault_with_roles, roles):
+        write_note(vault_with_roles, "system", roles,
+                   path="SYSTEM/HANDBOOK/broken.md",
+                   frontmatter=_fm(), body="See [[missing-target]]")
+
+        out = maintain.run_maintenance(vault_with_roles, "vault_manager", roles,
+                                       mode="maintain", distribute_issues=True)
+        assert out["distribution"]["created"]
+
+        open_issues = issues.list_issues(vault_with_roles, state="open")
+        # Every created issue carries an assignee — none left null.
+        assert all(i["assignee"] for i in open_issues), \
+            [(i["key"], i["assignee"]) for i in open_issues]
+        # The system-domain finding routes to the default owner.
+        sys_issue = next(i for i in open_issues
+                        if i["target"] == "SYSTEM/HANDBOOK/broken.md")
+        assert sys_issue["assignee"] == "default"
+
+    def test_distribute_routes_work_domain_to_its_owner(self, vault_with_roles,
+                                                        roles):
+        # Creative domain owns work/creative/** via write glob.
+        write_note(vault_with_roles, "creative", roles,
+                   path="WORK/CREATIVE/notes/orphan.md",
+                   frontmatter=_fm())
+        # An orphan has no links — give it a hub neighbour so it is detected.
+        write_note(vault_with_roles, "creative", roles,
+                   path="WORK/CREATIVE/notes/hub.md",
+                   frontmatter=_fm(), body="[[orphan]]")
+
+        out = maintain.run_maintenance(vault_with_roles, "vault_manager", roles,
+                                       mode="maintain", distribute_issues=True)
+        assert out["distribution"]["created"]
+
+        open_issues = issues.list_issues(vault_with_roles, state="open")
+        creative_issues = [i for i in open_issues
+                           if i["target"].startswith("WORK/CREATIVE/")]
+        assert creative_issues
+        assert all(i["assignee"] == "creative" for i in creative_issues)
+
+    def test_distribute_ownerless_path_stays_unassigned(self, vault_with_roles,
+                                                         roles):
+        # A path outside every ownership glob has no derived owner, so it
+        # stays null and remains manager triage (unchanged behaviour).
+        findings = [{
+            "check": "tag_normalization",
+            "path": "ROOT-ONLY.md",   # matches no ownership glob
+            "severity": "low",
+            "detail": "x",
+            "suggestion": "y",
+            "nature": "suggestion",
+        }]
+        result = maintain.distribute(vault_with_roles, "vault_manager",
+                                     roles, findings)
+        assert result["created"]
+        rec = issues.read_issue(vault_with_roles,
+                                "tag_normalization|ROOT-ONLY.md")
+        assert rec is not None and rec["assignee"] is None

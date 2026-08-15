@@ -112,6 +112,17 @@ first.
   `missed_connection` you judge not worth linking is `declined` (recorded
   permanently). The real missed-link/orphan gaps (e.g. in `short film/prova/**`)
   are *not* exempted or declined and stay on the ledger to be fixed.
+- A `duplicate` of identical entry-point titles (`00-overview`) across
+  `system/handbook/**` subdomains is by-design convention, not a real
+  collision — it is **exempted** at `system/.vault/config.yaml`
+  (`duplicate: ["system/handbook/**/00-overview.md"]`), not declined.
+  Declining it would close the issue but leave the store empty and the
+  finding recomputing every sweep; exempt makes the engine stop raising it.
+  The same logic applies to any partner-less suggestion (`tag_normalization`
+  of an intentional variant, `thin_note` on a deliberate stub): those also
+  carry no `partner`, so `declined` leaks for them too — exempt, don't
+  decline. Only `missed_connection` (a pair, with `partner`) is safe to
+  decline.
 
 ## Typical flow
 

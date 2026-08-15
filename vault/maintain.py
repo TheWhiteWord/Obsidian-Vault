@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from .config import resolve_config
 from .generate import write_index
 from .grants import RoleRegistry
+from .ownership import owner_of
 from .notes import Note, derive_vocabulary, iter_notes
 from .paths import relative_to_vault, safe_join
 from . import audit
@@ -695,6 +696,7 @@ def prune_findings(vault_root: Path,
 def distribute(
     vault_root: Path,
     agent: str,
+    roles: RoleRegistry,
     findings: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Turn findings into ledger issues (dedupe by key, re-open when recurs).
@@ -702,12 +704,24 @@ def distribute(
     Every finding becomes an issue record: ``key = <check>|<path>``,
     ``target = path``, ``tags: [maintenance]``. Creating is the escalation
     valve — any registered agent may raise; the audit trail records who.
+
+    Assignee is auto-computed: the derived owner of ``f["path"]`` from
+    ``roles.yaml`` write globs (most-specific wins, via ``owner_of``). The
+    owning domain agent is the one who can resolve content; routing the
+    issue to it on creation is what makes ``assigned_to=me`` a real query
+    instead of every agent scanning the whole ledger. A finding whose path
+    matches no ownership glob (truly ownerless — near-impossible given the
+    default owner holds ``system/**`` and contributors hold their
+    ``work/**``) gets ``assignee=None`` and remains manager triage, exactly
+    as before.
     """
+    write_globs = roles._write_globs
     created: List[str] = []
     skipped: List[str] = []
     reopened: List[str] = []
     for f in findings:
         key = f"{f['check']}|{f['path']}"
+        assignee = owner_of(write_globs, f["path"])
         out = issues.create_issue(
             vault_root, agent,
             key=key,
@@ -717,6 +731,7 @@ def distribute(
             nature=f.get("nature", "finding"),
             priority=f.get("severity", "medium"),
             tags=["maintenance"],
+            assignee=assignee,
             partner=f.get("partner"),
         )
         (created if out["result"] == issues.RESULT_CREATED
@@ -900,7 +915,7 @@ def run_maintenance(
         if _findings_path(vault_root, run_id) else None)
 
     if distribute_issues and findings:
-        result["distribution"] = distribute(vault_root, agent, findings)
+        result["distribution"] = distribute(vault_root, agent, roles, findings)
     else:
         result["distribution"] = {"created": [], "reopened": [], "skipped": []}
 
