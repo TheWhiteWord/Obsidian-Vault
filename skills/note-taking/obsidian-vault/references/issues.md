@@ -76,14 +76,28 @@ first.
   else is refused.
 - `declined` with a `reason` is the honest "not going to happen" — use it
   rather than leaving issues open forever.
-- **A recurring finding that is correct *by design* for your scope is a
-  scope-exemption, not a decline.** If the sweep keeps raising the same
-  "by design" finding for your domain (e.g. `system/skills/**` files
-  documented as "not vault notes"), the durable fix is a `maintenance`
-  exemption in your own scope's config (`obsidian_edit_config`), which makes
-  the sweep stop raising it at generation and auto-resolves the open issues
-  (`scope-exempted`). Declining each instance doesn't stick and pollutes the
-  ledger. See the manager's `config-authoring.md` §8 for the shape.
+- **A recurring finding correct *by design* for your scope is a
+  scope-exemption, not a decline — and declining does not stick.** A
+  `maintenance` suggestion/finding that is a false positive *re-raises on the
+  next sweep* (`maintain` daily, `optimize` weekly) even after you decline
+  it, so the ledger refills with the same noise. The durable fix is a
+  `maintenance` exemption in your own scope's config (`obsidian_edit_config`),
+  which makes the sweep stop raising it at generation and auto-resolves the
+  open issues (`scope-exempted`). See the manager's `config-authoring.md` §8
+  for the shape.
+- **Know the test before you exempt.** Exempt only when the finding is
+  *structurally correct by design* — e.g. a folder-navigated unit whose notes
+  are reached by opening the folder, not by `[[links]]` (so `orphan` is the
+  wrong check for it); or notes that are siblings by construction. **If the
+  finding reveals a real gap you intend to fix**, do *not* exempt — claim it
+  (`in_progress`) and fix the link/note, which closes it honestly. Exempting a
+  fixable finding hides the thing you meant to repair, and the gap stays.
+- **Worked example (already in place).** `work/creative/projects/short
+  stories/**` and `work/creative/projects/TV Series/the writing is on the
+  wall/**` are folder-structured story/project units; their `orphan` findings
+  are false positives by design and are exempted at the scope config. The
+  real missed-link/orphan gaps (e.g. in `short film/prova/**`) are *not*
+  exempted and stay on the ledger to be fixed.
 
 ## Typical flow
 

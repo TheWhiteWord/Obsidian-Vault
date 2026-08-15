@@ -78,6 +78,15 @@ FINDINGS_DIRNAME = "findings"
 CHECKS = ("dangling", "orphan", "malformed", "empty", "missing_field",
           "case_collision")
 
+#: ``missed_connection`` ignores a tag carried by at least this fraction of
+#: all notes (or at least this many notes, whichever first) — such tags are
+#: structural (project/section labels, e.g. a project's name tag on every
+#: note in it), not content-resonance signals. Counting them would make the
+#: rule fire on every sibling pair in a tagged project. Fixed + visible, not
+#: learned: see docs/design/optimize-suggestions-reprise.md.
+MISSING_CONNECTION_PERVASIVE_RATIO = 0.20
+MISSING_CONNECTION_PERVASIVE_MIN = 2
+
 
 class MaintainError(Exception):
     """Raised for invalid maintain requests (unknown mode, no state dir)."""
@@ -438,6 +447,46 @@ def _dedupe(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+def _project_unit(path: str) -> str:
+    """The project unit a note belongs to, for ``missed_connection``.
+
+    Notes under a per-project root (``work/creative/projects/<name>/``,
+    ``work/coding/projects/<name>/``) are grouped by that project folder;
+    everything else groups by its top-level tree. Project-unit grouping keeps
+    the "pervasive within the project" tag filter scoped to one project, so a
+    label universal inside a project is not mistaken for vault-wide resonance.
+    """
+    parts = path.split("/")
+    if len(parts) >= 4 and parts[0] in ("work",) and parts[2] == "projects":
+        return "/".join(parts[:4])  # work/<domain>/projects/<name>
+    return parts[0] if parts else "."
+
+
+def _pervasive_tags(
+    notes: Iterable[Note], ratio: float, minimum: int
+) -> Set[str]:
+    """Tags carried by so many notes they carry no connection signal.
+
+    A tag on at least ``max(minimum, int(total * ratio))`` notes is structural
+    (a project or section label every note in that project wears), not a
+    content-resonance marker. ``missed_connection`` excludes these so it does
+    not flag every sibling pair in a tagged project as a "missed link".
+
+    Fixed thresholds (not learned) keep the rule deterministic and visible —
+    see docs/design/optimize-suggestions-reprise.md.
+    """
+    total = 0
+    counts: Dict[str, int] = {}
+    for note in notes:
+        total += 1
+        for tag in note.tags:
+            counts[tag] = counts.get(tag, 0) + 1
+    if total == 0:
+        return set()
+    threshold = max(minimum, int(total * ratio))
+    return {tag for tag, n in counts.items() if n >= threshold}
+
+
 def run_suggestions(
     vault_root: Path,
     agent: str,
@@ -468,7 +517,33 @@ def run_suggestions(
                 f"[[wikilinks]]. Rename or accept folder-scoped linking. "
                 f"Notes: {paths}", nature="suggestion"))
 
-    # Missed connections: same tree, share >= 2 tags, no link either way.
+    # Missed connections: within one project unit, share >= 2 *content* tags,
+    # no link either way. A "project unit" is the folder under a per-project
+    # root (e.g. work/creative/projects/<name>/) or the top-level tree
+    # otherwise. Tags carried by most notes *within that unit* are structural
+    # (the project/section label every note in it wears) and carry no
+    # connection signal, so they are ignored before counting shared tags.
+    # Without this the rule fires on every sibling pair in a tagged project
+    # (reported as ~50 boilerplate suggestions for the TV Series / short
+    # stories scopes); see docs/design/optimize-suggestions-reprise.md.
+    # Missed connections: within one top-level tree, share >= 2 *content*
+    # tags, no link either way. A shared tag is treated as structural noise
+    # (and dropped) only when it is pervasive within BOTH notes' own project
+    # units -- i.e. a project/section label every note in that project wears,
+    # not a content-resonance signal. Comparison stays within the top-level
+    # tree so genuine resonance ACROSS projects (e.g. a theme tag shared by
+    # two different stories) still surfaces. Without this per-unit filter the
+    # rule fires on every sibling pair in a tagged project (reported as ~50
+    # boilerplate suggestions for the TV Series / short stories scopes); see
+    # docs/design/optimize-suggestions-reprise.md.
+    by_unit: Dict[str, List[Note]] = {}
+    for note in notes:
+        by_unit.setdefault(_project_unit(note.path), []).append(note)
+    pervasive_by_unit: Dict[str, Set[str]] = {}
+    for unit, group in by_unit.items():
+        pervasive_by_unit[unit] = _pervasive_tags(
+            group, MISSING_CONNECTION_PERVASIVE_RATIO,
+            MISSING_CONNECTION_PERVASIVE_MIN)
     by_tree: Dict[str, List[Note]] = {}
     for note in notes:
         tree = note.path.split("/")[0] if "/" in note.path else "."
@@ -476,7 +551,9 @@ def run_suggestions(
     for tree, group in by_tree.items():
         for i, a in enumerate(group):
             for b in group[i + 1:]:
-                shared = set(a.tags) & set(b.tags)
+                pa = pervasive_by_unit.get(_project_unit(a.path), set())
+                pb = pervasive_by_unit.get(_project_unit(b.path), set())
+                shared = (set(a.tags) & set(b.tags)) - pa - pb
                 if len(shared) < 2:
                     continue
                 if b.path in g.neighbors(a.path):
