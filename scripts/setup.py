@@ -27,7 +27,8 @@ from pathlib import Path
 
 from vault_ops import (_active_agent_names, _block_text, _create_profile,
                        _grant_role, _revoke_globs, _role_skill,
-                       _soul_identity, enable_plugin_for_profile,
+                       _soul_identity, disable_profile_moa,
+                       enable_plugin_for_profile,
                        ensure_peer_memory, ensure_soul_sections,
                        install_cron_jobs, install_skills, profile_home,
                        refresh_profiles, scaffold_vault, seed_profile_config)
@@ -298,6 +299,12 @@ def _finalize(state: dict, hermes_home: Path, dry_run: bool) -> list[str]:
     for prof in sorted(p for p, roles in profiles.items()
                        if "manager" in roles):
         out.extend(install_cron_jobs(prof, dry_run=dry_run))
+        # P-429: disable MoA on that same profile so each maintenance turn is
+        # one sequential LLM call (parallel fanout across co-firing jobs would
+        # stack into ~6 simultaneous calls → HTTP 429). SETUP-time change so a
+        # fresh install gets it automatically. Contributors (no manager role)
+        # keep MoA for interactive work.
+        out.extend(disable_profile_moa(prof, dry_run=dry_run))
 
     if not dry_run:
         _save_setup_state(hermes_home, {"stage": 0, "answers": {}})

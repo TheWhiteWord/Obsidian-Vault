@@ -775,7 +775,14 @@ def refresh_profiles(hermes_home: Path, dry_run: bool = False) -> list[str]:
         else:
             enable_plugin_for_profile(hermes_home, name, Path(vault_path))
         if role in ("manager", "combined"):
-            out.extend(install_cron_jobs(name))
+            # Sync (not just create): a plugin update may have changed a
+            # job's schedule/prompt/skills in CRON_JOBS, and the live job
+            # keyed by the same name must be brought back in line.
+            out.extend(sync_cron_jobs(name))
+            # P-429: the manager/combined profile runs the maintenance cron
+            # jobs; disable MoA so each turn is one sequential LLM call
+            # (parallel fanout would stack across co-firing jobs → HTTP 429).
+            out.extend(disable_profile_moa(name))
         out.append(f"refresh {name}: role={role}")
 
     return out
@@ -962,6 +969,205 @@ def install_cron_jobs(profile: str, dry_run: bool = False) -> list[str]:
             detail = (res.stderr or res.stdout).strip()
             out.append(f"WARNING: cron create failed for {name} on "
                        f"{profile}: {detail}")
+    return out
+
+
+def _parse_cron_list(stdout: str) -> list[dict]:
+    """Parse `hermes cron list` table output into job dicts.
+
+    The CLI has no --json flag, so the table is the interface. Each job
+    block starts with an indented `<job_id> [<state>]` line, followed by
+    indented `Key: value` lines (`Name:`, `Schedule:`, `Skills:`,
+    `Deliver:`, ...). Unknown keys are ignored; a block without a Name is
+    dropped (nothing to key on). Skills are comma-separated in the table
+    and come back as a list.
+    """
+    import re
+
+    jobs: list[dict] = []
+    cur: dict | None = None
+    head = re.compile(r"^\s*([0-9a-fA-F]{6,})\s+\[")
+    field = re.compile(r"^\s+([A-Za-z][A-Za-z ]*?):\s*(.*?)\s*$")
+    for line in stdout.splitlines():
+        m = head.match(line)
+        if m:
+            cur = {"job_id": m.group(1), "name": None,
+                   "schedule": None, "skills": [], "deliver": None}
+            jobs.append(cur)
+            continue
+        m = field.match(line)
+        if not m:
+            continue
+        key, val = m.group(1).strip().lower(), m.group(2)
+        if cur is None:
+            # A Name line with no preceding id header (older/partial
+            # output): synthesise a block so name lookups still work.
+            cur = {"job_id": None, "name": None,
+                   "schedule": None, "skills": [], "deliver": None}
+            jobs.append(cur)
+        if key == "name":
+            cur["name"] = val
+        elif key == "schedule":
+            cur["schedule"] = val
+        elif key == "deliver":
+            cur["deliver"] = val
+        elif key == "skills":
+            cur["skills"] = [s.strip() for s in val.split(",") if s.strip()]
+    return [j for j in jobs if j["name"]]
+
+
+def _cron_list_jobs(profile: str) -> tuple[list[dict], str | None]:
+    """The profile's live cron jobs, plus an error string when unreadable.
+
+    Returns ([], "<detail>") when the CLI is missing or exits non-zero —
+    the caller surfaces that as a WARNING and does nothing else (failing
+    safe: never create a duplicate, never edit blind).
+    """
+    import subprocess
+
+    try:
+        res = subprocess.run(_cron_cmd(profile, "cron", "list"),
+                             check=False, capture_output=True, text=True,
+                             timeout=120)
+    except FileNotFoundError:
+        return [], "hermes CLI not found"
+    if res.returncode != 0:
+        return [], ((res.stderr or res.stdout).strip() or "cron list failed")
+    return _parse_cron_list(res.stdout), None
+
+
+def sync_cron_jobs(profile: str, dry_run: bool = False) -> list[str]:
+    """Bring the profile's maintenance cron jobs in line with CRON_JOBS.
+
+    The update path for `setup.py --refresh` (run after `hermes plugins
+    update`). `install_cron_jobs` is create-only: a live job whose NAME
+    already exists is left untouched, so a changed schedule/prompt/skills
+    in CRON_JOBS never reached an installed profile. This subsumes it:
+
+    * name MISSING          → `cron create` (same command as install)
+    * name EXISTS, drifted  → `cron edit <job_id> --schedule ... --prompt
+      ... --skill ...` (schedule and/or skills differ from the repo spec)
+    * name EXISTS, matches  → no-op ("in sync")
+
+    Comparison uses the live `Schedule` and `Skills` read back from
+    `hermes cron list` (the table is the only interface — no --json). The
+    prompt is NOT compared: it can be truncated in the table, so on the
+    edit path it is always re-sent, which makes the live prompt match the
+    repo. Failure-tolerant: every subprocess error becomes a `WARNING:`
+    recap line, never an exception. dry_run shells out nothing.
+    Returns recap lines.
+    """
+    import subprocess
+
+    out: list[str] = []
+    if dry_run:
+        for spec in CRON_JOBS:
+            out.append(f"[dry-run] cron sync {spec['name']} on {profile} "
+                       f"({spec['schedule']})")
+        return out
+
+    jobs, err = _cron_list_jobs(profile)
+    if err is not None:
+        out.append(f"WARNING: cron sync failed on {profile}: cron list: {err}")
+        return out
+    by_name = {j["name"]: j for j in jobs}
+
+    for spec in CRON_JOBS:
+        name = spec["name"]
+        live = by_name.get(name)
+        if live is None:
+            cmd = _cron_cmd(profile, "cron", "create",
+                            spec["schedule"], spec["prompt"],
+                            "--name", name, "--deliver", "local")
+            for skill in spec["skills"]:
+                cmd += ["--skill", skill]
+            verb, past = "create", "created"
+        else:
+            drift = []
+            if (live["schedule"] or "") != spec["schedule"]:
+                drift.append(f"schedule {live['schedule']!r}→"
+                             f"{spec['schedule']!r}")
+            if live["skills"] != spec["skills"]:
+                drift.append(f"skills {live['skills']}→{spec['skills']}")
+            if not drift:
+                out.append(f"cron: {name} in sync on {profile} "
+                           f"({spec['schedule']})")
+                continue
+            if not live["job_id"]:
+                out.append(f"WARNING: cron sync failed for {name} on "
+                           f"{profile}: drifted ({'; '.join(drift)}) but no "
+                           "job id parsed from cron list")
+                continue
+            cmd = _cron_cmd(profile, "cron", "edit", live["job_id"],
+                            "--schedule", spec["schedule"],
+                            "--prompt", spec["prompt"])
+            for skill in spec["skills"]:
+                cmd += ["--skill", skill]
+            verb, past = "edit", f"updated ({'; '.join(drift)})"
+
+        try:
+            res = subprocess.run(cmd, check=False, capture_output=True,
+                                 text=True, timeout=120)
+        except FileNotFoundError:
+            out.append(f"WARNING: cron {verb} failed for {name} on "
+                       f"{profile}: hermes CLI not found")
+            continue
+        if res.returncode == 0:
+            out.append(f"cron: {name} {past} on {profile} "
+                       f"({spec['schedule']})")
+        else:
+            detail = (res.stderr or res.stdout).strip()
+            out.append(f"WARNING: cron {verb} failed for {name} on "
+                       f"{profile}: {detail}")
+    return out
+
+
+def disable_profile_moa(profile: str, dry_run: bool = False) -> list[str]:
+    """Disable MoA (mixture-of-agents fanout) for a profile's agent turns.
+
+    Why: a manager-profile turn with MoA enabled (fanout: user_turn) fires
+    several parallel LLM calls per turn against one API key. When the
+    maintenance cron jobs fire together (incl. a gateway catch-up burst) the
+    parallel fanout from each job stacks into ~6 simultaneous calls and hits
+    HTTP 429, erroring the run. Disabling MoA makes every turn a single
+    sequential call — the manager role has no interactive fanout need.
+
+    This is a SETUP/refresh step (not a one-off edit) so a fresh install of
+    the manager role gets it automatically. Only the manager/combined role
+    profile is touched (the caller decides — contributors may keep MoA for
+    interactive work).
+
+    Interface: the hermes CLI, matching the existing pattern
+    (`enable_plugin_for_profile` uses `hermes --profile NAME plugins enable`;
+    `_cron_cmd` uses `hermes --profile NAME cron ...`). The command is::
+
+        hermes [--profile NAME] config set moa.enabled false
+
+    Idempotent: a key already set false is a no-op CLI write. Failure-
+    tolerant: any subprocess error (CLI missing, non-zero exit) is surfaced
+    as a WARNING recap line and never raises — setup must not crash on it.
+    dry_run shells out nothing (mirrors install_cron_jobs): it only appends
+    a `[dry-run]` recap line. Returns recap lines.
+    """
+    import subprocess
+
+    out: list[str] = []
+    if dry_run:
+        out.append(f"[dry-run] config set moa.enabled false on {profile}")
+        return out
+    cmd = _cron_cmd(profile, "config", "set", "moa.enabled", "false")
+    try:
+        res = subprocess.run(cmd, check=False, capture_output=True,
+                             text=True, timeout=120)
+    except FileNotFoundError:
+        out.append(f"WARNING: MoA disable failed for {profile}: "
+                   f"hermes CLI not found")
+        return out
+    if res.returncode == 0:
+        out.append(f"moa: disabled for {profile} (moa.enabled=false)")
+    else:
+        detail = (res.stderr or res.stdout).strip()
+        out.append(f"WARNING: MoA disable failed for {profile}: {detail}")
     return out
 
 

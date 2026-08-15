@@ -493,6 +493,260 @@ def test_install_cron_jobs_create_failure_warns(monkeypatch):
     assert all("WARNING" in l and "boom" in l for l in lines)
 
 
+# --- sync_cron_jobs (update path for --refresh) -----------------------------
+
+_LIVE_BOTH_IN_SYNC = (
+    "  1a3ad126297a [active]\n"
+    "    Name:      vault-maintain-daily\n"
+    "    Schedule:  0 5 * * *\n"
+    "    Repeat:    \u221e\n"
+    "    Deliver:   local\n"
+    "    Skills:    obsidian-vault-management\n"
+    "    Last run:  never\n"
+    "  b2b2b2b2b2b2 [active]\n"
+    "    Name:      vault-optimize-weekly\n"
+    "    Schedule:  0 6 * * 1\n"
+    "    Deliver:   local\n"
+    "    Skills:    obsidian-vault-management\n"
+)
+
+
+def _is_edit(cmd):
+    """Whether a recorded command is a `cron edit`."""
+    return any(cmd[i:i + 2] == ["cron", "edit"]
+               for i in range(len(cmd) - 1))
+
+
+def _edit_job_id(cmd):
+    """The positional job id right after `cron edit`."""
+    i = next(i for i in range(len(cmd) - 1)
+             if cmd[i:i + 2] == ["cron", "edit"])
+    return cmd[i + 2]
+
+
+def test_sync_cron_jobs_in_sync_issues_no_edit(monkeypatch):
+    """Live jobs matching the repo spec (name+schedule+skills) are left
+    alone: only the single `cron list` is shelled."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls,
+                                           list_stdout=_LIVE_BOTH_IN_SYNC))
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    assert [c for c in calls if _is_edit(c) or _is_create(c)] == []
+    assert len(calls) == 1 and calls[0][-2:] == ["cron", "list"]
+    assert len(lines) == 2 and all("in sync" in l for l in lines)
+
+
+def test_sync_cron_jobs_drifted_schedule_issues_edit(monkeypatch):
+    """A live job whose schedule drifted from CRON_JOBS is edited by its
+    parsed job id, with the repo schedule, prompt and skills re-sent."""
+    live = _LIVE_BOTH_IN_SYNC.replace("0 5 * * *", "30 4 * * *")
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=live))
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    edits = [c for c in calls if _is_edit(c)]
+    assert len(edits) == 1
+    cmd = edits[0]
+    assert cmd[:3] == ["hermes", "--profile", "vault-manager"]
+    assert _edit_job_id(cmd) == "1a3ad126297a"
+    assert cmd[cmd.index("--schedule") + 1] == "0 5 * * *"
+    assert cmd[cmd.index("--skill") + 1] == "obsidian-vault-management"
+    assert "--prompt" in cmd
+    assert [c for c in calls if _is_create(c)] == []
+    assert any("vault-maintain-daily updated" in l for l in lines)
+    assert any("vault-optimize-weekly in sync" in l for l in lines)
+
+
+def test_sync_cron_jobs_drifted_skills_issues_edit(monkeypatch):
+    """Skills drift alone also triggers the edit."""
+    live = _LIVE_BOTH_IN_SYNC.replace(
+        "    Skills:    obsidian-vault-management\n"
+        "    Last run:  never\n",
+        "    Skills:    obsidian-vault\n    Last run:  never\n")
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=live))
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    edits = [c for c in calls if _is_edit(c)]
+    assert len(edits) == 1
+    assert _edit_job_id(edits[0]) == "1a3ad126297a"
+    assert any("skills" in l for l in lines if "updated" in l)
+
+
+def test_sync_cron_jobs_missing_job_is_created(monkeypatch):
+    """A spec with no live job of that name is created, exactly as
+    install_cron_jobs does (deliver=local, --name, --skill)."""
+    live = "\n".join(_LIVE_BOTH_IN_SYNC.splitlines()[:7]) + "\n"  # daily only
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=live))
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    creates = [c for c in calls if _is_create(c)]
+    assert len(creates) == 1
+    cmd = creates[0]
+    assert _create_schedule(cmd) == "0 6 * * 1"
+    assert cmd[cmd.index("--name") + 1] == "vault-optimize-weekly"
+    assert cmd[cmd.index("--deliver") + 1] == "local"
+    assert cmd[cmd.index("--skill") + 1] == "obsidian-vault-management"
+    assert [c for c in calls if _is_edit(c)] == []
+    assert any("vault-optimize-weekly created" in l for l in lines)
+
+
+def test_sync_cron_jobs_default_uses_bare_command(monkeypatch):
+    """One-agent installs: the manager role on `default` → bare hermes."""
+    live = _LIVE_BOTH_IN_SYNC.replace("0 5 * * *", "30 4 * * *")
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=live))
+
+    installer.sync_cron_jobs("default")
+
+    assert all("--profile" not in c for c in calls)
+    assert all(c[0] == "hermes" for c in calls)
+
+
+def test_sync_cron_jobs_dry_run_never_shells(monkeypatch):
+    """--dry-run reports the sync without touching the CLI at all."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run", _fake_run_recorder(calls))
+
+    lines = installer.sync_cron_jobs("vault-manager", dry_run=True)
+
+    assert calls == []
+    assert len(lines) == 2 and all("[dry-run]" in l for l in lines)
+
+
+def test_sync_cron_jobs_list_failure_warns(monkeypatch):
+    """An unreadable `cron list` is a WARNING recap, not a crash — and
+    nothing else is shelled (fail safe: no blind create/edit)."""
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 1, "", "list boom")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    assert len(lines) == 1
+    assert "WARNING" in lines[0] and "list boom" in lines[0]
+    assert len(calls) == 1
+
+
+def test_sync_cron_jobs_edit_failure_warns(monkeypatch):
+    """A failing `cron edit` is a visible WARNING recap, not a crash."""
+    live = _LIVE_BOTH_IN_SYNC.replace("0 5 * * *", "30 4 * * *")
+    def fake_run(cmd, **kw):
+        if cmd[-2:] == ["cron", "list"]:
+            return subprocess.CompletedProcess(cmd, 0, live, "")
+        return subprocess.CompletedProcess(cmd, 1, "", "edit boom")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    assert any("WARNING" in l and "edit boom" in l for l in lines)
+    assert any("in sync" in l for l in lines)
+
+
+def test_sync_cron_jobs_cli_missing_warns(monkeypatch):
+    """No hermes CLI on PATH → WARNING recap, never a FileNotFoundError."""
+    def fake_run(cmd, **kw):
+        raise FileNotFoundError("hermes")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    lines = installer.sync_cron_jobs("vault-manager")
+
+    assert len(lines) == 1 and "WARNING" in lines[0]
+    assert "not found" in lines[0]
+
+
+def test_parse_cron_list_reads_id_name_schedule_skills():
+    """The table parser: one dict per job block, skills split on commas."""
+    jobs = installer._parse_cron_list(_LIVE_BOTH_IN_SYNC)
+    assert [j["job_id"] for j in jobs] == ["1a3ad126297a", "b2b2b2b2b2b2"]
+    assert jobs[0]["name"] == "vault-maintain-daily"
+    assert jobs[0]["schedule"] == "0 5 * * *"
+    assert jobs[0]["skills"] == ["obsidian-vault-management"]
+    assert jobs[0]["deliver"] == "local"
+    assert installer._parse_cron_list("") == []
+
+
+# --- disable_profile_moa (P-429) -------------------------------------------
+
+def _is_config_set_moa(cmd):
+    """Whether a recorded command is `config set moa.enabled false`."""
+    return any(cmd[i:i + 4] == ["config", "set", "moa.enabled", "false"]
+               for i in range(len(cmd) - 3))
+
+
+def test_disable_profile_moa_issues_config_set_on_named_profile(monkeypatch):
+    """Manager (named) profile: `--profile` scoped `config set moa.enabled
+    false` via the hermes CLI."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=""))
+
+    lines = installer.disable_profile_moa("vault-manager")
+
+    moa = [c for c in calls if _is_config_set_moa(c)]
+    assert len(moa) == 1
+    cmd = moa[0]
+    assert cmd[0] == "hermes" and cmd[1:3] == ["--profile", "vault-manager"]
+    assert cmd[3:7] == ["config", "set", "moa.enabled", "false"]
+    assert any("disabled for vault-manager" in l for l in lines)
+
+
+def test_disable_profile_moa_default_uses_bare_command(monkeypatch):
+    """One-agent install: manager role on `default` → bare hermes (no
+    --profile), mirroring install_cron_jobs / enable_plugin_for_profile."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls, list_stdout=""))
+
+    installer.disable_profile_moa("default")
+
+    moa = [c for c in calls if _is_config_set_moa(c)]
+    assert len(moa) == 1
+    cmd = moa[0]
+    assert cmd[0] == "hermes"
+    assert "--profile" not in cmd
+
+
+def test_disable_profile_moa_dry_run_never_shells(monkeypatch):
+    """--dry-run reports the config set without touching the CLI."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+                        _fake_run_recorder(calls))
+
+    lines = installer.disable_profile_moa("vault-manager", dry_run=True)
+
+    assert calls == []
+    assert len(lines) == 1 and "[dry-run]" in lines[0]
+
+
+def test_disable_profile_moa_failure_warns(monkeypatch):
+    """A failing `config set` is a visible WARNING recap line, not a crash."""
+    import subprocess
+    def fake_run(cmd, **kw):
+        if cmd[-2:] == ["cron", "list"]:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.CompletedProcess(cmd, 1, "", "rate limited")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    lines = installer.disable_profile_moa("vault-manager")
+
+    assert len(lines) == 1
+    assert "WARNING" in lines[0] and "rate limited" in lines[0]
+
+
 # --- _create_profile -------------------------------------------------------
 
 def test_create_profile_warns_on_existing(tmp_path, monkeypatch, capsys):
