@@ -14,6 +14,8 @@ Key                          Behaviour
 ``defaults``                 child overrides key-by-key
 ``fields.*.required``        nearest declaration wins — a child may add or drop (P7 relax)
 ``tags.mode``                child overrides wholly
+``maintenance.exempt``      union — child ADDS exemptions
+``maintenance.exempt_only`` replace — child's map IS the exemption set (restricts)
 ===========================  ==========================================
 
 The uniformity contract (§3.2) is enforced here: a child may constrain or
@@ -40,6 +42,7 @@ from .constants import (
     STATE_PATH_KEY,
     VOCABULARY_FLAG,
 )
+from .grants import path_matches
 from .paths import VaultPathError
 
 logger = logging.getLogger(__name__)
@@ -135,7 +138,10 @@ def _merge_field(
 
 def merge_configs(configs: List[Dict[str, Any]], sources: List[Path]) -> Dict[str, Any]:
     """Merge an ordered root-first list of raw configs into one resolved config."""
-    resolved: Dict[str, Any] = {"fields": {}, "defaults": {}, "tags": {}, "validation": {}}
+    resolved: Dict[str, Any] = {
+        "fields": {}, "defaults": {}, "tags": {}, "validation": {},
+        "maintenance": {"exempt": {}, "exempt_only": {}, "restricted": set()},
+    }
 
     for raw, source in zip(configs, sources):
         for field_name, child_def in (raw.get("fields") or {}).items():
@@ -154,6 +160,42 @@ def merge_configs(configs: List[Dict[str, Any]], sources: List[Path]) -> Dict[st
         # tags / validation: shallow override
         resolved["tags"].update(raw.get("tags") or {})
         resolved["validation"].update(raw.get("validation") or {})
+
+        # maintenance: exemptions, per-check
+        mnt = raw.get("maintenance")
+        if mnt is not None:
+            if not isinstance(mnt, dict):
+                raise ConfigError(
+                    f"{source}: maintenance must be a mapping, got "
+                    f"{type(mnt).__name__}"
+                )
+            for mode in ("exempt", "exempt_only"):
+                if mode in mnt:
+                    section = mnt[mode]
+                    if not isinstance(section, dict):
+                        raise ConfigError(
+                            f"{source}: maintenance.{mode} must be a mapping"
+                        )
+                    target = resolved["maintenance"].setdefault(mode, {})
+                    for check, globs in section.items():
+                        if not isinstance(globs, list) or not all(
+                            isinstance(g, str) for g in globs
+                        ):
+                            raise ConfigError(
+                                f"{source}: maintenance.{mode}.{check} must be "
+                                f"a list of path globs"
+                            )
+                        if mode == "exempt_only":
+                            # replace — this scope's list IS the exemption set
+                            target[check] = list(globs)
+                            resolved["maintenance"]["restricted"].add(check)
+                        else:
+                            # union — child ADDS exemptions
+                            existing = target.get(check, [])
+                            for g in globs:
+                                if g not in existing:
+                                    existing.append(g)
+                            target[check] = existing
 
         # shallow-override dict sections
         for key in ("status_overrides", "value_overrides", "vocabulary",
@@ -184,12 +226,28 @@ class ResolvedConfig:
     vocabulary: Dict[str, Any] = dc_field(default_factory=dict)
     scopes: Dict[str, Any] = dc_field(default_factory=dict)
     paths: Dict[str, Any] = dc_field(default_factory=dict)
+    maintenance: Dict[str, Any] = dc_field(
+        default_factory=lambda: {"exempt": {}, "exempt_only": {}, "restricted": set()}
+    )
     summary_field: Optional[str] = None
     sources: List[Path] = dc_field(default_factory=list)
 
     @property
     def required_fields(self) -> List[str]:
         return [n for n, d in self.fields.items() if d.get("required")]
+
+    def exempt_for(self, check: str, path: str) -> bool:
+        """Is ``check`` exempted for ``path`` in this scope's merged config?
+
+        ``exempt`` globs match against the vault-relative path. If the check
+        is also marked ``restricted`` (a child used ``exempt_only``), only the
+        child's list counts — the child opted back in. Unknown check names
+        are never exempted (a scope may name a future check).
+        """
+        exempt = self.maintenance.get("exempt", {}).get(check, [])
+        if check in self.maintenance.get("restricted", set()):
+            exempt = self.maintenance.get("exempt_only", {}).get(check, [])
+        return any(path_matches(g, path) for g in exempt)
 
     def allowed_values(self, field_name: str) -> Optional[List[str]]:
         """Declared vocabulary for a field, or None when unconstrained."""
@@ -252,6 +310,7 @@ class ResolvedConfig:
             "status_overrides": self.status_overrides,
             "vocabulary": self.vocabulary,
             "scopes": self.scopes,
+            "maintenance": self.maintenance,
             "sources": [str(p) for p in self.sources],
         }
 
@@ -274,6 +333,10 @@ def resolve_config(vault_root: Path, target: Path) -> ResolvedConfig:
         vocabulary=merged.get("vocabulary", {}),
         scopes=merged.get("scopes", {}),
         paths=merged.get("paths", {}),
+        maintenance=merged.get(
+            "maintenance",
+            {"exempt": {}, "exempt_only": {}, "restricted": set()},
+        ),
         summary_field=merged.get("summary_field"),
         sources=sources,
     )

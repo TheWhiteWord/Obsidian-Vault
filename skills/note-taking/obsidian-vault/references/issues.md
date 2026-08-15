@@ -76,6 +76,14 @@ first.
   else is refused.
 - `declined` with a `reason` is the honest "not going to happen" — use it
   rather than leaving issues open forever.
+- **A recurring finding that is correct *by design* for your scope is a
+  scope-exemption, not a decline.** If the sweep keeps raising the same
+  "by design" finding for your domain (e.g. `system/skills/**` files
+  documented as "not vault notes"), the durable fix is a `maintenance`
+  exemption in your own scope's config (`obsidian_edit_config`), which makes
+  the sweep stop raising it at generation and auto-resolves the open issues
+  (`scope-exempted`). Declining each instance doesn't stick and pollutes the
+  ledger. See the manager's `config-authoring.md` §8 for the shape.
 
 ## Typical flow
 

@@ -103,6 +103,30 @@ Lifecycle rules:
 The manager resolves/declines/prunes **only its own** issues
 (`raised_by` = itself); agent-raised issues are the raiser's to close.
 
+## Scope exemptions
+
+A scope may declare that a check does not apply to a set of its files, so a
+recurring "by design" finding stops being raised at all:
+
+```yaml
+maintenance:
+  exempt:             # union with parent — this scope ADDS exemptions
+    duplicate: ["system/skills/**"]
+  exempt_only:        # replace — this scope's list IS the set (restricts)
+    duplicate: ["work/creative/knowledge/**"]
+```
+
+- Resolved via each scope's `config_chain` (nearest wins), mirroring
+  `fields.*.allowed` / `allowed_only`; globs match with the shared
+  `path_matches` matcher (case-insensitive, `**` works).
+- Consulted at **finding generation** — an exempted finding never becomes an
+  issue. Open issues whose check/target is exempted auto-resolve
+  (`reason: scope-exempted`), including suggestions (which would otherwise
+  linger the 14-day TTL).
+- Use it for findings that are correct *by design*; do not use it to hide
+  genuine problems. The exemption is an explicit config edit, never a hidden
+  side-effect of a decline.
+
 ## Cron
 
 The setup questionnaire installs the maintenance schedule on whichever

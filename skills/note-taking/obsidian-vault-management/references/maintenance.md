@@ -56,6 +56,12 @@ actions, wrong paths, agents acting outside their expected scope.
   growth; `obsidian_edit_metadata` for frontmatter-level fixes (never body).
   Regenerate the registry (`obsidian_index` with `registry_to`) after config
   changes, for a human-readable view of the effective schema.
+- **Scope exemptions:** a recurring finding that is correct *by design* for a
+  scope is durably answered with a `maintenance` exemption in that scope's
+  config (`obsidian_edit_config`), not by declining each instance — the
+  sweep stops raising exempted findings at generation, and open issues whose
+  check/target is exempted auto-resolve (`scope-exempted`). See
+  `config-authoring.md` §8.
 - **Escalate:** content-judgment findings stay with the domain owner — the
   sweep distributes them; make sure they land as ledger issues.
 - **Structural changes** (new contributors, domains, config files) run

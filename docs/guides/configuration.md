@@ -38,6 +38,7 @@ reference.
 | `summary_field` | Which field INDEX renders as the one-line summary (e.g. `description`) |
 | `scopes` | Reserved — merged but unused |
 | `status_overrides` / `value_overrides` | Per-class allowed-value maps (generalised: `{field, by, map}`) |
+| `maintenance` | Scope exemptions for the maintenance sweep (`exempt` union / `exempt_only` replace — see below) |
 
 `roles.yaml` is a separate sibling file — grants only, no field
 schema. It is changed by the growth CLI, never by hand

@@ -32,6 +32,7 @@ inherits.
 | `summary_field` | Which field INDEX renders as the one-line summary (e.g. `description`). |
 | `scopes` | Reserved — merged but unused (deferred design). |
 | `status_overrides` / `value_overrides` | Per-class allowed-value maps (generalised: `{field, by, map}`). |
+| `maintenance` | Scope exemptions for the maintenance sweep (see §8). |
 
 `roles.yaml` is a separate sibling file — grants only, no field schema. It is
 changed by the growth protocol, never by hand.
@@ -141,3 +142,36 @@ Common starter shapes to seed a suggestion (adapt, never copy blindly):
 When proposing fields for a new subdomain, resolve the parent first
 (`obsidian_context`), then propose only the delta — `obsidian_scaffold` /
 `obsidian_edit_config` will compute exactly that.
+
+## 8. `maintenance` — scope exemptions for the sweep
+
+A scope may declare that a maintenance check does **not** apply to a set of
+its files, so the sweep stops raising the same "by design" finding forever.
+This is the durable answer to a recurring finding that is intentional — the
+engine learns the rule from config; it does not re-ask each run.
+
+```yaml
+maintenance:
+  exempt:             # union with parent — this scope ADDS exemptions
+    duplicate: ["system/skills/**"]
+    orphan:   ["system/skills/**"]
+  exempt_only:        # replace — this scope's list IS the set (restricts)
+    duplicate: ["work/creative/knowledge/**"]
+```
+
+- **`exempt`** — union with the parent scope: a child adds to the inherited
+  globs. **`exempt_only`** — replace: the child's list is the exemption set
+  (marked `restricted`), so a sub-scope can opt back INTO a check the parent
+  exempted. This mirrors `fields.*.allowed` / `allowed_only`.
+- A check is exempted for a path when the resolved globs match it (shared
+  `path_matches` matcher; case-insensitive, `**` works). Unknown check names
+  are tolerated — a scope may name a future check; they never raise.
+- The sweep consults this at **finding generation**: an exempted finding
+  never becomes an issue. Open issues whose check/target is exempted are
+  auto-resolved (`reason: scope-exempted`).
+- **Use it for** findings that are correct *by design* for a scope (e.g.
+  `system/skills/**` files documented as "not vault notes"). Do **not** use
+  it to hide genuine problems — the exemption is an explicit, visible,
+  grant-gated config edit, never a hidden side-effect of a decline.
+- Like other config, the nearest scope wins; write the exemption in the
+  scope that owns the affected files.

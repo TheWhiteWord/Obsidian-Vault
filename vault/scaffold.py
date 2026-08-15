@@ -83,6 +83,24 @@ def _delta_against_inherited(proposed: Dict[str, Any], cfg) -> Dict[str, Any]:
             if current != value:
                 delta.setdefault(section, {})[key] = value
 
+    # maintenance: only the two authorable modes are ever carried into a
+    # delta — ``restricted`` is a derived merge marker (set by ``exempt_only``),
+    # never authored, so it is neither proposed nor written. A check key
+    # appears in the delta only when its proposed globs differ from the
+    # inherited value, so the user sees only real changes (like the other
+    # sections above).
+    proposed_mnt = proposed.get("maintenance") or {}
+    inherited_mnt = cfg.maintenance or {}
+    for mode in ("exempt", "exempt_only"):
+        proposed_section = proposed_mnt.get(mode) or {}
+        inherited_section = inherited_mnt.get(mode) or {}
+        section_delta = {}
+        for check, globs in proposed_section.items():
+            if list(globs) != list(inherited_section.get(check, []) or []):
+                section_delta[check] = list(globs)
+        if section_delta:
+            delta.setdefault("maintenance", {})[mode] = section_delta
+
     return delta
 
 
@@ -228,6 +246,24 @@ def _merge_delta_into_raw(raw: Dict[str, Any], delta: Dict[str, Any]) -> Dict[st
                     "paths"):
         for key, value in (delta.get(section) or {}).items():
             merged.setdefault(section, {})[key] = value
+
+    # maintenance: persist the two authorable modes. ``exempt`` unions with
+    # what this file already declares (the delta carries the full proposed
+    # glob list for a changed check); ``exempt_only`` replaces — its list IS
+    # the exemption set for that check. ``restricted`` is derived at resolve
+    # time and is never written.
+    for mode, replace in (("exempt", False), ("exempt_only", True)):
+        for check, globs in (delta.get("maintenance", {}).get(mode) or {}).items():
+            block = merged.setdefault("maintenance", {}).setdefault(mode, {})
+            if replace:
+                block[check] = list(globs)
+            else:
+                existing = list(block.get(check, []))
+                for g in globs:
+                    if g not in existing:
+                        existing.append(g)
+                block[check] = existing
+
     if "summary_field" in delta:
         merged["summary_field"] = delta["summary_field"]
     return merged

@@ -40,6 +40,25 @@ from . import graph as graph_mod
 
 logger = logging.getLogger(__name__)
 
+
+def _filter_exempted(vault_root: Path, findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop findings whose check is exempted for the target path (P12).
+
+    Consulted at finding-GENERATION time: a scope's ``maintenance.exempt`` /
+    ``exempt_only`` (resolved via its ``config_chain``) says the check does
+    not apply to that path, so the condition never becomes an issue.
+    """
+    out: List[Dict[str, Any]] = []
+    for f in findings:
+        target = f.get("path", "")
+        if not target:
+            continue
+        cfg = resolve_config(Path(vault_root).resolve(), safe_join(Path(vault_root).resolve(), target))
+        if cfg.exempt_for(f["check"], target):
+            continue
+        out.append(f)
+    return out
+
 #: Audit actions that mutate notes (the change set). ``issue_*`` actions
 #: mutate the ledger, not notes — they are never part of the change set.
 NOTE_ACTIONS = ("create", "edit", "edit_meta", "delete", "scaffold")
@@ -323,7 +342,7 @@ def run_delta(
     return {
         "mode": "delta",
         "changed": sorted(changed),
-        "findings": findings,
+        "findings": _filter_exempted(vault_root, findings),
         "indexed": indexed,
         "promoted": promoted,
         "last_line": new_last,
@@ -404,7 +423,7 @@ def run_census(vault_root: Path) -> List[Dict[str, Any]]:
         if not g.neighbors(note.path):
             findings.append(_check_orphan(g, note.path))
 
-    return _dedupe(findings)
+    return _dedupe(_filter_exempted(root, findings))
 
 
 def _dedupe(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -490,7 +509,7 @@ def run_suggestions(
             "Note has very little body content",
             "Expand it, or delete it", nature="suggestion"))
 
-    return _dedupe(findings)
+    return _dedupe(_filter_exempted(root, findings))
 
 
 def _normalise(title: str) -> str:
@@ -592,6 +611,17 @@ def auto_resolve(
             continue  # cannot close what we cannot touch — leave for the owner
 
         if record.get("nature") == "suggestion":
+            # A suggestion whose check/target is now exempted closes
+            # immediately (P12) — the scope declared it by-design, so it
+            # should not linger the full 14-day TTL.
+            check = key.split("|", 1)[0]
+            if _exempt(vault_root, target, check):
+                out = issues.resolve_issue(
+                    vault_root, agent, key, state="resolved",
+                    reason="scope-exempted")
+                if out["result"] == issues.RESULT_CLOSED:
+                    resolved.append(key)
+                continue
             created_at = record.get("created_at", "")
             try:
                 age_days = (datetime.now(timezone.utc)
@@ -627,7 +657,14 @@ def _condition_holds(
     note_map: Dict[str, Note],
     vault_root: Path,
 ) -> bool:
-    """Does the finding still exist? (True = keep the issue open.)"""
+    """Does the finding still exist? (True = keep the issue open.)
+
+    An exempted check/target (P12: the scope declared the finding by-design
+    via ``maintenance.exempt``) is treated as cleared — the engine no longer
+    counts that condition, so ``auto_resolve`` may close the open issue.
+    """
+    if _exempt(vault_root, target, check):
+        return False
     if check == "dangling":
         return _check_dangling(g, target) is not None
     if check == "orphan":
@@ -643,6 +680,22 @@ def _condition_holds(
         return _parent_has_case_collision(vault_root, target)
     # Unknown check: keep it open rather than close on a guess.
     return True
+
+
+def _exempt(vault_root: Path, target: str, check: str) -> bool:
+    """Is ``check`` exempted for ``target`` under the nearest scope config?
+
+    Resolves the merged ``maintenance`` section via ``config_chain`` on the
+    note's folder and tests the check's globs against the vault-relative path
+    with the shared ``path_matches`` matcher.
+    """
+    try:
+        cfg = resolve_config(Path(vault_root).resolve(), safe_join(Path(vault_root).resolve(), target))
+    except Exception:
+        # A path we cannot resolve a config for is never treated as exempt —
+        # default to checking it rather than silently suppressing a finding.
+        return False
+    return cfg.exempt_for(check, target)
 
 
 # ---------------------------------------------------------------------------
