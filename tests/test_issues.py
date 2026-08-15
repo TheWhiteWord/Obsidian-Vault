@@ -108,9 +108,15 @@ class TestLifecycle:
         issues.create_issue(vault_with_roles, "vault_manager",
                             key=KEY, subject="s", detail="d", target="a.md")
         issues.resolve_issue(vault_with_roles, "vault_manager", KEY)
+        # Re-asserting the SAME closed state is idempotent.
         out = issues.resolve_issue(vault_with_roles, "vault_manager", KEY,
-                                   state="declined")
+                                   state="resolved")
         assert out["result"] == "already_closed"
+        # An explicit owner override to a different closed state is allowed
+        # (e.g. decline a previously-resolved suggestion).
+        out2 = issues.resolve_issue(vault_with_roles, "vault_manager", KEY,
+                                    state="declined", reason="reconsider")
+        assert out2["result"] == "closed"
 
     def test_resolve_rejects_invalid_closure_state(self, vault_with_roles):
         issues.create_issue(vault_with_roles, "vault_manager",

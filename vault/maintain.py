@@ -194,9 +194,11 @@ def _neighbourhood(graph: graph_mod.Graph, paths: Iterable[str]) -> Set[str]:
 # ---------------------------------------------------------------------------
 
 def _finding(check: str, path: str, severity: str, detail: str,
-             suggestion: str, nature: str = "finding") -> Dict[str, Any]:
+             suggestion: str, nature: str = "finding",
+             partner: Optional[str] = None) -> Dict[str, Any]:
     return {"check": check, "path": path, "severity": severity,
-            "detail": detail, "suggestion": suggestion, "nature": nature}
+            "detail": detail, "suggestion": suggestion, "nature": nature,
+            "partner": partner}
 
 
 def _check_dangling(graph: graph_mod.Graph, path: str) -> Optional[Dict[str, Any]]:
@@ -517,25 +519,21 @@ def run_suggestions(
                 f"[[wikilinks]]. Rename or accept folder-scoped linking. "
                 f"Notes: {paths}", nature="suggestion"))
 
-    # Missed connections: within one project unit, share >= 2 *content* tags,
-    # no link either way. A "project unit" is the folder under a per-project
-    # root (e.g. work/creative/projects/<name>/) or the top-level tree
-    # otherwise. Tags carried by most notes *within that unit* are structural
-    # (the project/section label every note in it wears) and carry no
-    # connection signal, so they are ignored before counting shared tags.
-    # Without this the rule fires on every sibling pair in a tagged project
-    # (reported as ~50 boilerplate suggestions for the TV Series / short
-    # stories scopes); see docs/design/optimize-suggestions-reprise.md.
     # Missed connections: within one top-level tree, share >= 2 *content*
     # tags, no link either way. A shared tag is treated as structural noise
     # (and dropped) only when it is pervasive within BOTH notes' own project
     # units -- i.e. a project/section label every note in that project wears,
     # not a content-resonance signal. Comparison stays within the top-level
     # tree so genuine resonance ACROSS projects (e.g. a theme tag shared by
-    # two different stories) still surfaces. Without this per-unit filter the
-    # rule fires on every sibling pair in a tagged project (reported as ~50
-    # boilerplate suggestions for the TV Series / short stories scopes); see
+    # two different stories) still surfaces.
+    #
+    # A proposition an owner has *declined* is permanently recorded
+    # (issues.record_decline) and loaded here once per run; any pair in the
+    # store is skipped so the engine never re-proposes it and no agent
+    # re-assesses it. The store is keyed by note -> [partners] for O(1) lookup,
+    # so vault growth adds no per-proposition scan cost. See
     # docs/design/optimize-suggestions-reprise.md.
+    declined = issues.load_declined(vault_root)
     by_unit: Dict[str, List[Note]] = {}
     for note in notes:
         by_unit.setdefault(_project_unit(note.path), []).append(note)
@@ -551,6 +549,8 @@ def run_suggestions(
     for tree, group in by_tree.items():
         for i, a in enumerate(group):
             for b in group[i + 1:]:
+                if b.path in declined.get(a.path, []) or a.path in declined.get(b.path, []):
+                    continue  # owner declined this pair before; don't re-propose
                 pa = pervasive_by_unit.get(_project_unit(a.path), set())
                 pb = pervasive_by_unit.get(_project_unit(b.path), set())
                 shared = (set(a.tags) & set(b.tags)) - pa - pb
@@ -562,7 +562,7 @@ def run_suggestions(
                     "missed_connection", a.path, "low",
                     f"Shares {len(shared)} tags with {b.path} but is not linked",
                     f"Consider linking: shared tags: {', '.join(sorted(shared))}",
-                    nature="suggestion"))
+                    nature="suggestion", partner=b.path))
 
     # Tag normalisation: same tag in multiple case variants.
     by_lower: Dict[str, Set[str]] = {}
@@ -679,6 +679,7 @@ def distribute(
             nature=f.get("nature", "finding"),
             priority=f.get("severity", "medium"),
             tags=["maintenance"],
+            partner=f.get("partner"),
         )
         (created if out["result"] == issues.RESULT_CREATED
          else reopened if out["result"] == issues.RESULT_REOPENED

@@ -154,13 +154,16 @@ def create_issue(
     priority: str = "medium",
     tags: Optional[List[str]] = None,
     assignee: Optional[str] = None,
+    partner: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Open an issue — or skip / re-open an existing one with the same key.
 
     Dedupe and re-escalation are the same mechanism: if a
     record with this key is ``open``/``in_progress``, return ``exists``; if
-    it is ``resolved``/``declined``, re-open it (history stays attached);
-    otherwise create it. Every mutation is audited with ``path`` = target.
+    it is ``resolved``, re-open it (a genuine regression); if it is
+    ``declined``, return ``exists`` — a decline is a permanent owner rejection
+    and must not re-raise. Otherwise create it. Every mutation is audited with
+    ``path`` = target.
     """
     if nature not in ISSUE_NATURES:
         raise IssueError(f"unknown nature {nature!r}; valid: {list(ISSUE_NATURES)}")
@@ -181,6 +184,12 @@ def create_issue(
     existing = _read(path) if path.exists() else None
     if existing and existing.get("state") in ("open", "in_progress"):
         return {"result": "exists", "key": key, "state": existing["state"]}
+    if existing and existing.get("state") == "declined":
+        # A declined suggestion is a permanent owner rejection — it must not
+        # re-raise, or the engine would re-propose it and force re-assessment
+        # on every sweep. Only a resolved record re-opens (a genuine
+        # regression); a declined one stays closed until the owner reconsiders.
+        return {"result": "exists", "key": key, "state": "declined"}
 
     if existing:
         # Re-escalation: re-open the same key, keep the original created_at
@@ -189,6 +198,8 @@ def create_issue(
                   "resolved_by": None, "resolved_at": None, "reason": None}
         if clean_assignee:
             record["assignee"] = clean_assignee
+        if partner:
+            record["partner"] = partner
         _atomic_write(path, record)
         audit.record(root, agent, "issue_reopen", record.get("target") or target,
                      key=key, nature=nature)
@@ -211,6 +222,7 @@ def create_issue(
         "resolved_by": None,
         "resolved_at": None,
         "reason": None,
+        "partner": partner,
     }
     _atomic_write(path, record)
     audit.record(root, agent, "issue_create", target,
@@ -250,10 +262,15 @@ def resolve_issue(
     record = _read(path)
     if record is None:
         return {"result": "not_found", "key": key}
-    if record["state"] in ("resolved", "declined"):
+    # Idempotency: re-asserting the same closed state is a no-op. But an owner
+    # may explicitly override a decline (e.g. resolve it after linking the
+    # notes) — that transition is allowed; only create_issue's silent re-open
+    # of declined records is blocked (see create_issue).
+    if record["state"] == state:
         return {"result": "already_closed", "key": key, "state": record["state"]}
 
     now = _now()
+    prev_state = record["state"]  # capture before we mutate it below
     if state == "in_progress":
         record.update(state="in_progress", updated_at=now, claimed_by=agent)
     else:
@@ -268,7 +285,99 @@ def resolve_issue(
         return {"result": "claimed", "key": key, "state": state}
     audit.record(root, agent, "issue_resolve", record["target"],
                  key=key, state=state, reason=reason)
+    # A decline records the proposition as permanently rejected so the engine
+    # stops re-proposing it (see the _DECLINE note on run_suggestions). Moving
+    # away from a declined state (re-open / resolve) clears that record. Use
+    # the pre-update state, since record["state"] is already the new state.
+    if state == "declined" and record.get("partner"):
+        record_decline(root, record["target"], record["partner"])
+    elif prev_state == "declined" and state != "declined":
+        remove_decline(root, record["target"], record.get("partner"))
     return {"result": "closed", "key": key, "state": state}
+
+
+#: Declined propositions live in the engine state dir, not in any note folder.
+#: A proposition spans >= 2 notes, so per-folder storage would duplicate the
+#: record across both; a single vault-wide store keyed by note -> [partners]
+#: avoids that and gives O(1) lookup per note at sweep time. See
+#: docs/design/optimize-suggestions-reprise.md.
+DECLINED_STORE_REL = "maintenance/declined.yaml"
+
+
+def _maintain_store_path(vault_root: Path) -> Optional[Path]:
+    cfg = resolve_config(Path(vault_root), Path(vault_root))
+    state = cfg.state_path()
+    if not state:
+        return None
+    return safe_join(Path(vault_root), state) / "maintenance" / "declined.yaml"
+
+
+def _read_yaml(path: Path) -> Dict[str, Any]:
+    import yaml
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _write_yaml(path: Path, data: Dict[str, Any]) -> None:
+    import yaml
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".yaml.tmp")
+    tmp.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=True),
+                   encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def load_declined(vault_root: Path) -> Dict[str, List[str]]:
+    """Declined propositions: note path -> list of declined partner paths.
+
+    Empty dict when the store is absent (no declines yet) or there is no
+    state dir. Loaded once per sweep; the engine does O(1) lookups against it
+    rather than scanning the whole vault's dismissals per proposition.
+    """
+    path = _maintain_store_path(vault_root)
+    if path is None or not path.exists():
+        return {}
+    try:
+        data = _read_yaml(path)
+    except (ValueError, OSError):
+        return {}
+    store = data.get("declined", {}) if isinstance(data, dict) else {}
+    return {k: list(v) for k, v in store.items()}
+
+
+def record_decline(vault_root: Path, target: str, partner: str) -> None:
+    """Record target<->partner as a permanently declined proposition (both ways)."""
+    if not target or not partner or target == partner:
+        return
+    path = _maintain_store_path(vault_root)
+    if path is None:
+        return
+    store = load_declined(vault_root)
+    store.setdefault(target, [])
+    store.setdefault(partner, [])
+    if partner not in store[target]:
+        store[target].append(partner)
+    if target not in store[partner]:
+        store[partner].append(target)
+    _write_yaml(path, {"declined": store})
+
+
+def remove_decline(vault_root: Path, target: Optional[str], partner: Optional[str]) -> None:
+    """Clear a declined proposition when an owner re-opens / resolves it."""
+    if not target or not partner:
+        return
+    path = _maintain_store_path(vault_root)
+    if path is None or not path.exists():
+        return
+    store = load_declined(vault_root)
+    changed = False
+    for a, b in ((target, partner), (partner, target)):
+        if a in store and b in store[a]:
+            store[a].remove(b)
+            changed = True
+        if a in store and not store[a]:
+            del store[a]
+    if changed:
+        _write_yaml(path, {"declined": store})
 
 
 def assign_issue(

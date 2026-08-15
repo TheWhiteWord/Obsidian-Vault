@@ -74,30 +74,36 @@ first.
 - You may act on an issue only when you hold `write` or `meta` over its
   target — issues about your domain are yours to claim/close; anything
   else is refused.
-- `declined` with a `reason` is the honest "not going to happen" — use it
-  rather than leaving issues open forever.
+- **`declined` is a permanent owner decision — it sticks.** When you decline a
+  suggestion (esp. a `missed_connection`), the engine records the pair in
+  `.state/maintenance/declined.yaml` and never re-proposes it; the issue does
+  not re-open on the next sweep. So a decline is your standing call as the
+  domain owner and needs no further action. Re-opening/re-resolving the issue
+  (e.g. after you link the notes) clears that record. Decline only when the
+  proposition is genuinely not a connection you want — your judgment of
+  utility, not the engine's, decides.
 - **A recurring finding correct *by design* for your scope is a
-  scope-exemption, not a decline — and declining does not stick.** A
-  `maintenance` suggestion/finding that is a false positive *re-raises on the
-  next sweep* (`maintain` daily, `optimize` weekly) even after you decline
-  it, so the ledger refills with the same noise. The durable fix is a
-  `maintenance` exemption in your own scope's config (`obsidian_edit_config`),
-  which makes the sweep stop raising it at generation and auto-resolves the
-  open issues (`scope-exempted`). See the manager's `config-authoring.md` §8
-  for the shape.
-- **Know the test before you exempt.** Exempt only when the finding is
-  *structurally correct by design* — e.g. a folder-navigated unit whose notes
-  are reached by opening the folder, not by `[[links]]` (so `orphan` is the
-  wrong check for it); or notes that are siblings by construction. **If the
-  finding reveals a real gap you intend to fix**, do *not* exempt — claim it
-  (`in_progress`) and fix the link/note, which closes it honestly. Exempting a
-  fixable finding hides the thing you meant to repair, and the gap stays.
+  scope-exemption, not a decline.** When the *check itself* is wrong for the
+  whole scope (e.g. `orphan` on a folder-navigated unit), exempt it in your
+  scope's config (`obsidian_edit_config`) — that makes the sweep stop raising
+  it and auto-resolves the open issues (`scope-exempted`). See the manager's
+  `config-authoring.md` §8 for the shape. Use `declined` for a single
+  proposition you reject; use `exempt` for a whole class the engine should
+  never raise in your scope.
+- **Know the test before you exempt or decline.** Exempt/decline only when the
+  finding is *structurally correct by design* — e.g. a folder-navigated unit
+  whose notes are reached by opening the folder, not by `[[links]]`; or notes
+  that are siblings by construction. **If the finding reveals a real gap you
+  intend to fix**, do *not* exempt or leave it declined — claim it
+  (`in_progress`) and fix the link/note, which closes it honestly. Hiding a
+  fixable finding (via exempt or a decline you didn't mean) leaves the gap.
 - **Worked example (already in place).** `work/creative/projects/short
   stories/**` and `work/creative/projects/TV Series/the writing is on the
   wall/**` are folder-structured story/project units; their `orphan` findings
-  are false positives by design and are exempted at the scope config. The
-  real missed-link/orphan gaps (e.g. in `short film/prova/**`) are *not*
-  exempted and stay on the ledger to be fixed.
+  are false positives by design and are exempted at the scope config. A
+  `missed_connection` you judge not worth linking is `declined` (recorded
+  permanently). The real missed-link/orphan gaps (e.g. in `short film/prova/**`)
+  are *not* exempted or declined and stay on the ledger to be fixed.
 
 ## Typical flow
 

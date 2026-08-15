@@ -93,15 +93,41 @@ The fix shipped as a deterministic, visible rule in `vault/maintain.py`
   sibling stories), none are project/section boilerplate. Regressed-guarded by
   `tests/test_missed_connection.py` (500 tests pass suite-wide).
 
+## Declined propositions are permanently recorded (2026-08-15) — IMPLEMENTED
+
+The second half of the reprise problem: a *rejected* suggestion must not
+re-raise and force re-assessment on every sweep. Implemented in
+`vault/issues.py` + `vault/maintain.py`:
+
+- A `declined` suggestion records the pair in a single vault-wide store,
+  `.state/maintenance/declined.yaml` (dict `note -> [partners]`), both ways.
+  The engine loads it **once per sweep** and does O(1) per-note lookups, so
+  vault growth adds no per-proposition scan cost (owner's scale concern).
+- `run_suggestions` skips any `missed_connection` pair present in the store —
+  the proposition is never emitted, so no agent re-assesses it.
+- `declined` is permanent: `create_issue` no longer re-opens a declined record
+  (only a `resolved` one re-opens on a genuine regression). `auto_resolve`
+  flips an aged, un-actioned suggestion to `declined` (implicit permanent
+  rejection), and an owner's explicit `declined` writes the store. Re-opening
+  or resolving the issue clears the store entry (e.g. after the owner links
+  the notes), so the record self-heals when the condition changes.
+- The decision is the **domain owner's** (not the human's): he declines via
+  `obsidian_issue_resolve`, grant-checked over the target. No soft/hard split —
+  a decline is just a durable rejection. Documented in the contributor
+  `issues.md` protocol.
+
+This is consistent with the earlier "no auto-learned rules" stance: a decline
+is an **explicit, owner-authored, per-pair, visible** record — not the engine
+inferring a general rule from behaviour.
+
 ## What was deliberately NOT done
 
-- **No auto-rule-learner from declines.** Explicitly rejected (owner's point
-  2): a growth-vault's notion of "a good connection" is too unstable to bake
-  into an emergent standing rule. The only durable memory mechanisms remain
-  `maintenance.exempt` (scoped, human-authored) and `vocabulary` promotion.
+- **No auto-rule-learner from declines.** (As above.)
 - **No per-scope `exempt` for `missed_connection`.** The heuristic fix removes
   the class of noise at the source; per-scope exemptions would just whack-a-mole
   each new project folder.
+- **No soft ("not now") rejection state.** Owner's call: a rejection is durable
+  by nature; there is no temporary-decline mode.
 - **`optimize` cadence (weekly vs on-request) left as a separate decision** —
   the suggestion itself is now low-noise enough that the cadence is a question
   of preference, not necessity.
