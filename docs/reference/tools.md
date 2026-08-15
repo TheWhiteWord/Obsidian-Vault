@@ -44,6 +44,12 @@ satisfiable by `append`); `edit`/`delete` → `write`; `edit_meta` →
 
 ## Issues
 
+> **IMPORTANT — conclude formally.** Deciding an issue in chat does not close it.
+> When you decide an issue is done, wrong, or not yours to act on, call
+> `obsidian_issue_resolve` to set its state — the ledger is the system of record,
+> not the conversation. An issue left `open` after you've moved on just clutters
+> the next sweep.
+
 | Tool | Purpose | Key parameters | Gate |
 |---|---|---|---|
 | `obsidian_issue` | Raise one or more issues on the ledger (the manager's batch). Records are invisible to search/graph by construction. Duplicate keys are skipped; a **resolved** issue with the same key is re-opened (a genuine regression) — a **declined** one stays closed (permanent owner rejection, recorded so it never re-raises). | `items` (required): `subject`, `detail`, `target` each; `priority`, `tags`, `key`, `assignee` (who should resolve — a SHOULD signal, never a grant override) optional | any registered agent |

@@ -68,6 +68,12 @@ first.
 
 ## Resolving
 
+> **IMPORTANT — conclude formally.** Deciding an issue in chat is not closing it.
+> When you decide an issue is done, wrong, or not yours to act on, call
+> `obsidian_issue_resolve` to set the state (`in_progress` / `resolved` /
+> `declined`) — the ledger is the system of record, not the conversation. An
+> issue left `open` after you've moved on just clutters the next sweep.
+
 `obsidian_issue_resolve` with `key` — claim it or close it:
 
 - `state: "in_progress"` claims it — you become the holder (`claimed_by`),

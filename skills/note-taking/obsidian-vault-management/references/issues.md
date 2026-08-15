@@ -60,6 +60,12 @@ reports `created`, `exists`, or `reopened` per item.
 
 ## Resolving and declining
 
+> **IMPORTANT — conclude formally.** Deciding an issue in chat is not closing it.
+> When you route, claim, or close an issue, call `obsidian_issue_resolve` to set
+> the state (`in_progress` / `resolved` / `declined`) — the ledger is the system
+> of record, not the conversation. An issue left `open` after you've moved on just
+> clutters the next sweep and hides what still needs a holder.
+
 `obsidian_issue_resolve` with `key` — claim (`in_progress`) or close
 (`resolved` / `declined`), with an optional `reason`. Your `meta` grant
 covers every target, so any issue is actionable.
