@@ -24,7 +24,9 @@ resolve), `claimed_by` (who claimed it), timestamps, and resolution info.
   `target` — no folders, no routing table, no per-domain inboxes. "My
   issues" is a query, not a location.
 - **Dedupe by key.** Raising an open key returns the existing record;
-  re-raising a closed one reopens it (history kept, priority preserved).
+  re-raising a **resolved** one reopens it (a genuine regression, history
+  kept, priority preserved); a **declined** one stays closed (permanent
+  owner rejection).
 - **Issues are not notes** — never write them with `obsidian_write`, never
   link them, never expect them in INDEX.
 
@@ -65,7 +67,13 @@ covers every target, so any issue is actionable.
 - `resolved` when the condition cleared. The sweep auto-resolves its own
   findings; manual resolution is for what it cannot see.
 - `declined` with an honest `reason` when an issue is not actionable — the
-  reason is what the raiser sees.
+  reason is what the raiser sees. A decline is **permanent**: the engine
+  records it (for a `missed_connection`, the note pair) in
+  `.state/maintenance/declined.yaml` and never re-proposes it, so the issue
+  does not re-open on the next sweep. Re-opening or resolving it later
+  clears that record. Use `declined` for a single proposition you reject;
+  use a `maintenance` exemption in the scope config for a whole class the
+  engine should never raise.
 - `in_progress` claims the issue (sets `claimed_by`) — use it when you are
   actively handling one, so the ledger shows who holds it.
 - Content judgment stays with the owning agent (the subdomain owner for

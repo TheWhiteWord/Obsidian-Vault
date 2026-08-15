@@ -354,7 +354,8 @@ OBSIDIAN_ISSUE_RESOLVE: Dict[str, Any] = {
         "Move an issue on the ledger: route it (assignee — sets who should "
         "resolve), claim it (in_progress — records you as the holder), or "
         "close it (resolved — the problem is fixed; declined — won't fix / "
-        "not a problem). Requires the 'write' or 'meta' grant over the "
+        "not a problem, and recorded permanently so the sweep never "
+        "re-proposes it). Requires the 'write' or 'meta' grant over the "
         "issue's target — you can act on issues about notes you own. "
         "Optionally record why."
     ),

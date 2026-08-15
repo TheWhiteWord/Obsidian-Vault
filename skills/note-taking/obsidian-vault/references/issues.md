@@ -24,7 +24,9 @@ resolve), `claimed_by` (who claimed it), timestamps, and resolution info.
   `target` — no folders, no routing table, no per-domain inboxes. "My
   issues" is a query, not a location.
 - **Dedupe by key.** Raising an open key returns the existing record;
-  re-raising a closed one reopens it (history kept, priority preserved).
+  re-raising a **resolved** one reopens it (a genuine regression, history
+  kept, priority preserved); a **declined** one stays closed (permanent
+  owner rejection).
 - **Issues are not notes** — never write them with `obsidian_write`, never
   link them, never expect them in INDEX.
 

@@ -55,14 +55,18 @@ by the wrong agent.
 
 - **`obsidian_issue`** — raise one or many issues (`items:` array).
   Optional per item: `priority`, `tags`, `key`, `assignee` (who should
-  resolve). Duplicate keys are skipped; a closed issue with the same key
-  is re-opened.
+  resolve). Duplicate keys are skipped; a **resolved** issue with the same
+  key is re-opened (a genuine regression) — a **declined** one stays closed,
+  because a decline is a permanent owner rejection recorded in
+  `.state/maintenance/declined.yaml` (the engine never re-proposes it).
 - **`obsidian_issue_resolve`** — move an issue's lifecycle: route it with
   `assignee=<profile>` (sets who should resolve, state untouched — the
   owner then claims/closes), claim with `state: in_progress`, or close
-  with `state: resolved | declined` and an optional `reason`. Assign,
-  claim, and resolve share the same grant gate (`write`/`meta` over the
-  target).
+  with `state: resolved | declined` and an optional `reason`. `declined` is
+  permanent: it records the proposition (for suggestions, the note pair) so
+  the sweep stops raising it; re-opening/resolving the issue clears that
+  record. Assign, claim, and resolve share the same grant gate
+  (`write`/`meta` over the target).
 - **`obsidian_issue_list`** — filter by `state` / `priority` / `tags` /
   `target` / `raised_by` / `assigned_to` (`me` = the calling agent);
   results are grant-intersected.

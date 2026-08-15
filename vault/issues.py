@@ -32,7 +32,10 @@ Record shape (engine-fixed, layout-independent):
 
 The **key is the dedupe unit**: deterministic (``type|path`` for manager
 findings), and the filename is derived from it. An open record with the same
-key is skipped (dedupe); a resolved one is re-opened (re-escalation).
+key is skipped (dedupe); a resolved one is re-opened on a genuine regression
+(re-escalation). A declined one stays closed — a decline is a permanent owner
+rejection, recorded so the engine never re-proposes it (see ``load_declined``
+and the decline store under the state dir).
 """
 
 from __future__ import annotations

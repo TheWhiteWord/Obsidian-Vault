@@ -173,10 +173,12 @@ maintenance:
   `system/skills/**` files documented as "not vault notes"; folder-navigated
   units whose notes are reached by opening the folder, not `[[links]]`, so
   `orphan` is the wrong check for them). Do **not** use it to hide genuine
-  problems: a declined maintenance finding *re-raises on the next sweep*, so
-  the exemption is the only durable answer to a by-design false positive — but
-  if the finding reveals a real gap you mean to fix, claim and fix it instead.
-  The exemption is an explicit, visible, grant-gated config edit, never a
+  problems: a single proposition you reject is durably handled by *declining*
+  it (recorded in `.state/maintenance/declined.yaml`, never re-raised), so
+  you only need an exemption for a *whole class* the engine should never raise
+  in your scope. If the finding reveals a real gap you mean to fix, claim and
+  fix it instead. The exemption is an explicit, visible, grant-gated config
+  edit, never a
   hidden side-effect of a decline.
 - Like other config, the nearest scope wins; write the exemption in the
   scope that owns the affected files.

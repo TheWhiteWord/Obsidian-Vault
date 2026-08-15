@@ -46,7 +46,7 @@ satisfiable by `append`); `edit`/`delete` → `write`; `edit_meta` →
 
 | Tool | Purpose | Key parameters | Gate |
 |---|---|---|---|
-| `obsidian_issue` | Raise one or more issues on the ledger (the manager's batch). Records are invisible to search/graph by construction. Duplicate keys are skipped; a closed issue with the same key is re-opened. | `items` (required): `subject`, `detail`, `target` each; `priority`, `tags`, `key`, `assignee` (who should resolve — a SHOULD signal, never a grant override) optional | any registered agent |
+| `obsidian_issue` | Raise one or more issues on the ledger (the manager's batch). Records are invisible to search/graph by construction. Duplicate keys are skipped; a **resolved** issue with the same key is re-opened (a genuine regression) — a **declined** one stays closed (permanent owner rejection, recorded so it never re-raises). | `items` (required): `subject`, `detail`, `target` each; `priority`, `tags`, `key`, `assignee` (who should resolve — a SHOULD signal, never a grant override) optional | any registered agent |
 | `obsidian_issue_resolve` | Move an issue: route it (`assignee` — sets who should resolve, state untouched), claim it (`in_progress` — records you as the holder) or close it (`resolved` fixed / `declined` won't fix). Optionally record why. | `key` (required); `assignee`, `state` (`in_progress` \| `resolved` \| `declined`), `reason` | `write` **or** `meta` over the target |
 | `obsidian_issue_list` | List issues, filtered and grant-intersected: you see only issues whose target you can read. "My issues" is a query, not a folder. | `state`, `priority`, `tags`, `target`, `raised_by`, `assigned_to` (`me` = calling agent), `limit` | `read` intersection |
 
