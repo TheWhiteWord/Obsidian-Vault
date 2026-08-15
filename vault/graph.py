@@ -14,6 +14,7 @@ title is kept as a dangling edge so the maintenance pass (P4) can flag it.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
@@ -25,19 +26,47 @@ class Graph:
 
     def __init__(self, notes: Iterable[Note]):
         self.notes: List[Note] = [n for n in notes if not n.error]
-        self._by_title: Dict[str, Note] = {}
+        self._by_title: Dict[str, List[Note]] = {}
         for n in self.notes:
-            self._by_title.setdefault(n.title.lower(), n)
+            self._by_title.setdefault(n.title.lower(), []).append(n)
 
         self.nodes: Set[str] = {n.path for n in self.notes}
         # outgoing[path] = list of (target_path_or_None, raw_label)
         self.outgoing: Dict[str, List[Tuple[Optional[str], str]]] = {p: [] for p in self.nodes}
         self.incoming: Dict[str, List[str]] = {p: [] for p in self.nodes}
         self.dangling: List[Tuple[str, str]] = []
+        # (source_path, label, candidate_paths) triples where a title-link is
+        # ambiguous: multiple same-title notes exist and none sits in the
+        # source's own folder. Deterministic target chosen, but recorded so the
+        # collision is visible rather than silently wrong.
+        self.ambiguous: List[Tuple[str, str, List[str]]] = []
 
         for n in self.notes:
             for label in n.links:
-                target = self._by_title.get(label.strip().lower())
+                candidates = self._by_title.get(label.strip().lower(), [])
+                # missing title → dangling (handled by the shared append below)
+                if not candidates:
+                    target = None
+                else:
+                    target = candidates[0]
+                    if len(candidates) > 1:
+                        src_dir = Path(n.path).parent
+                        same = [c for c in candidates if Path(c.path).parent == src_dir]
+                        if same:
+                            target = same[0]
+                        else:
+                            # pick nearest by longest common path prefix with the source
+                            def _score(c: Note) -> int:
+                                try:
+                                    return len(os.path.commonpath(
+                                        [str(Path(n.path).parent),
+                                         str(Path(c.path).parent)]))
+                                except ValueError:
+                                    return 0
+                            target = max(candidates, key=_score)
+                            self.ambiguous.append(
+                                (n.path, label.strip(),
+                                 sorted(c.path for c in candidates)))
                 target_path = target.path if target else None
                 self.outgoing[n.path].append((target_path, label.strip()))
                 if target_path:

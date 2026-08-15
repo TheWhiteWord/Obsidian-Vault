@@ -451,7 +451,8 @@ def run_suggestions(
 
     findings: List[Dict[str, Any]] = []
 
-    # Duplicates: same tree, identical normalised title.
+    # Duplicates: identical normalised title ANYWHERE in the vault. A title
+    # collision breaks title-based wikilinks, so flag it for disambiguation.
     by_title: Dict[str, List[Note]] = {}
     for note in notes:
         key = _normalise(note.title)
@@ -463,7 +464,9 @@ def run_suggestions(
             findings.append(_finding(
                 "duplicate", group[0].path, "low",
                 f"{len(group)} notes share the title '{key}'",
-                f"Merge into one note: {paths}", nature="suggestion"))
+                f"Disambiguate: same title '{key}' in multiple folders breaks "
+                f"[[wikilinks]]. Rename or accept folder-scoped linking. "
+                f"Notes: {paths}", nature="suggestion"))
 
     # Missed connections: same tree, share >= 2 tags, no link either way.
     by_tree: Dict[str, List[Note]] = {}
