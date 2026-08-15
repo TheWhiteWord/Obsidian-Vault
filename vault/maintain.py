@@ -407,6 +407,39 @@ def _promote_vocabulary(
 # Full census (B1) and suggestions (B2)
 # ---------------------------------------------------------------------------
 
+def _dangling_target_exists(vault_root: Path, src_path: str, label: str) -> bool:
+    """True if a dangling link's target resolves to a real file on disk.
+
+    The graph excludes generated files (INDEX) as nodes, so a link to one
+    reads as dangling even though the file exists. A link that resolves to any
+    on-disk ``.md`` is not a broken link and should not be flagged. Mirrors the
+    graph's path-qualified resolution (folder-relative, vault-root-relative,
+    suffix match) and falls back to a title-keyed note path.
+    """
+    root = Path(vault_root).resolve()
+    label = label.strip().lstrip("/")
+    if not label:
+        return False
+    parent = str(Path(src_path).parent)
+    norm = lambda p: os.path.normpath(p).replace(os.sep, "/")
+    candidates = [
+        norm(str(Path(parent) / label)),
+        norm(label),
+    ]
+    for cand in candidates:
+        for try_p in (cand, cand + ".md"):
+            if (root / try_p).is_file():
+                return True
+    # suffix match (Obsidian folder-hint): note whose path ends with label
+    suffix = label.rstrip("/")
+    for note in iter_notes(root):
+        p = note.path
+        if p == suffix or p.endswith("/" + suffix) \
+                or p == suffix + ".md" or p.endswith("/" + suffix + ".md"):
+            return True
+    return False
+
+
 def run_census(vault_root: Path) -> List[Dict[str, Any]]:
     """Full-vault B1: dangling, orphans, malformed, empty, missing fields,
     case-colliding folders."""
@@ -417,7 +450,12 @@ def run_census(vault_root: Path) -> List[Dict[str, Any]]:
 
     findings: List[Dict[str, Any]] = []
     findings.extend(_check_case_collisions(root))
-    for from_path, _label in g.dangling:
+    for from_path, label in g.dangling:
+        # A link whose target exists on disk is not a broken link — the graph
+        # simply does not track generated files (e.g. INDEX) as nodes, so a
+        # [[system/INDEX]] reference reads as dangling though the file is real.
+        if _dangling_target_exists(root, from_path, label):
+            continue
         findings.append(_check_dangling(g, from_path) or _finding(
             "dangling", from_path, "medium",
             "Has a dangling link", "Create the target or remove the link"))

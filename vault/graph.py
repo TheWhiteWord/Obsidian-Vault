@@ -8,8 +8,12 @@ sync with every write. The spec says "incremental" — deriving per call is the
 stronger form of that guarantee.
 
 Nodes are notes (by vault-relative path). Edges are `[[wikilinks]]`. Link
-targets are resolved to notes by title (case-insensitive); an edge to a missing
-title is kept as a dangling edge so the maintenance pass (P4) can flag it.
+targets are resolved by title (case-insensitive); a label carrying ``/`` or
+``..`` is treated as a *path-qualified* link and resolved Obsidian-style
+(folder-relative, vault-root-relative, then suffix match), so cross-folder
+``[[../comfyui/00-overview]]`` / ``[[folder/note]]`` links resolve correctly.
+An edge that resolves to nothing is kept as a dangling edge so the
+maintenance pass (P4) can flag it.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ class Graph:
         self._by_title: Dict[str, List[Note]] = {}
         for n in self.notes:
             self._by_title.setdefault(n.title.lower(), []).append(n)
+        self._by_path: Dict[str, Note] = {n.path: n for n in self.notes}
 
         self.nodes: Set[str] = {n.path for n in self.notes}
         # outgoing[path] = list of (target_path_or_None, raw_label)
@@ -44,9 +49,10 @@ class Graph:
         for n in self.notes:
             for label in n.links:
                 candidates = self._by_title.get(label.strip().lower(), [])
-                # missing title → dangling (handled by the shared append below)
+                # missing title → try path-qualified resolution before
+                # declaring dangling (Obsidian-style [[folder/note]] links).
                 if not candidates:
-                    target = None
+                    target = self._resolve_path(n.path, label.strip())
                 else:
                     target = candidates[0]
                     if len(candidates) > 1:
@@ -73,6 +79,39 @@ class Graph:
                     self.incoming[target_path].append(n.path)
                 else:
                     self.dangling.append((n.path, label.strip()))
+
+    def _resolve_path(self, src_path: str, label: str) -> Optional[Note]:
+        """Resolve a path-qualified wikilink label the way Obsidian does.
+
+        A label carrying ``/`` or ``..`` (or a leading ``/``) is a *path*, not a
+        title. Obsidian resolves it as: a folder-relative hint, optionally
+        vault-root-relative, falling back to a suffix match against any note
+        whose vault path ends with the given path. Returns the matched Note, or
+        ``None`` if nothing resolves (a genuine dangling link).
+        """
+        label = label.strip().lstrip("/")
+        if not label or ("/" not in label and not label.startswith("..")):
+            # pure title — not a path link; let the title lookup handle it
+            return None
+        parent = str(Path(src_path).parent)
+        norm = lambda p: os.path.normpath(p).replace(os.sep, "/")
+        candidates: List[str] = []
+        # (a) relative to the source note's own folder (handles ../ and sub/)
+        candidates.append(norm(str(Path(parent) / label)))
+        # (b) vault-root-relative (handles system/INDEX from a root note)
+        candidates.append(norm(label))
+        for cand in candidates:
+            for try_p in (cand, cand + ".md"):
+                if try_p in self._by_path:
+                    return self._by_path[try_p]
+        # (c) suffix match: any note whose vault path ends with this path
+        # (Obsidian's folder-hint behaviour for [[folder/note]]).
+        suffix = label.rstrip("/")
+        for path in self.nodes:
+            if path == suffix or path.endswith("/" + suffix) \
+                    or path == suffix + ".md" or path.endswith("/" + suffix + ".md"):
+                return self._by_path[path]
+        return None
 
     def neighbors(self, path: str) -> Set[str]:
         """All notes directly linked to/from ``path``."""
