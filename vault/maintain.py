@@ -543,6 +543,37 @@ def _write_findings(vault_root: Path, run_id: str,
             fh.write(json.dumps(f, default=str) + "\n")
 
 
+def prune_findings(vault_root: Path,
+                   keep_current_run_id: Optional[str] = None) -> int:
+    """Delete findings JSONL artifacts; return how many files were removed.
+
+    The findings file is write-only: ``distribute()`` turns the same in-memory
+    list into ledger issues, and nothing ever reads the JSONL back. Once a
+    run's findings are issues, its file is redundant — the ledger is the
+    durable record. ``keep_current_run_id`` spares exactly that run's file
+    (so ``result["findings_file"]`` stays a valid path); ``None`` deletes all.
+    Undeletable files are skipped, never fatal.
+    """
+    d = _maintain_dir(Path(vault_root))
+    if d is None:
+        return 0
+    findings_dir = d / FINDINGS_DIRNAME
+    if not findings_dir.is_dir():
+        return 0
+    deleted = 0
+    for path in sorted(findings_dir.glob("*.jsonl")):
+        if not path.is_file():
+            continue
+        if keep_current_run_id is not None and path.stem == keep_current_run_id:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        deleted += 1
+    return deleted
+
+
 def distribute(
     vault_root: Path,
     agent: str,
@@ -760,4 +791,11 @@ def run_maintenance(
     last_line = delta["last_line"]
     _write_checkpoint(vault_root, last_line)
     result["checkpoint"] = last_line
+
+    # This run's findings are now ledger issues, so every PRIOR run's
+    # write-only JSONL is redundant. Keep this run's file: it is the path
+    # reported in result["findings_file"] (and, when distribution is off,
+    # the sole record of the run). Never reached on dry_run.
+    result["findings_pruned"] = prune_findings(vault_root,
+                                               keep_current_run_id=run_id)
     return result

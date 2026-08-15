@@ -380,3 +380,101 @@ See [[missing-piece]].
         key = "dangling|Projects/launch.md"
         assert issues.read_issue(tmp_path, key)["state"] == "open"
         assert (tmp_path / "Archive/_state/issues").exists()
+
+
+class TestFindingsPruning:
+    """Findings JSONL is write-only — once distributed into the ledger the
+    file is redundant, so prior runs' files must not accumulate."""
+
+    @staticmethod
+    def _findings_dir(vault: Path) -> Path:
+        return maintain._maintain_dir(vault) / maintain.FINDINGS_DIRNAME
+
+    @staticmethod
+    def _names(d: Path):
+        return sorted(p.name for p in d.glob("*.jsonl"))
+
+    def test_prune_keeps_current_run_deletes_older(self, vault_with_roles):
+        d = self._findings_dir(vault_with_roles)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "20260804-101010.jsonl").write_text("{}\n", encoding="utf-8")
+        (d / "20260815-121212.jsonl").write_text("{}\n", encoding="utf-8")
+
+        n = maintain.prune_findings(
+            vault_with_roles, keep_current_run_id="20260815-121212")
+
+        assert n == 1
+        assert self._names(d) == ["20260815-121212.jsonl"]
+
+    def test_prune_with_none_deletes_all(self, vault_with_roles):
+        d = self._findings_dir(vault_with_roles)
+        d.mkdir(parents=True, exist_ok=True)
+        for rid in ("20260801-000001", "20260802-000002", "20260803-000003"):
+            (d / f"{rid}.jsonl").write_text("{}\n", encoding="utf-8")
+
+        assert maintain.prune_findings(vault_with_roles,
+                                       keep_current_run_id=None) == 3
+        assert self._names(d) == []
+
+    def test_prune_only_touches_jsonl(self, vault_with_roles):
+        d = self._findings_dir(vault_with_roles)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "20260801-000001.jsonl").write_text("{}\n", encoding="utf-8")
+        (d / "notes.txt").write_text("keep me", encoding="utf-8")
+
+        assert maintain.prune_findings(vault_with_roles) == 1
+        assert (d / "notes.txt").exists()
+
+    def test_prune_missing_dir_is_a_noop(self, vault_with_roles):
+        d = self._findings_dir(vault_with_roles)
+        assert not d.exists()
+        assert maintain.prune_findings(vault_with_roles) == 0
+        assert maintain.prune_findings(vault_with_roles,
+                                       keep_current_run_id="x") == 0
+
+    def test_sweep_leaves_only_the_current_runs_file(self, vault_with_roles,
+                                                     roles):
+        write_note(vault_with_roles, "system", roles,
+                   path="SYSTEM/HANDBOOK/broken.md",
+                   frontmatter=_fm(), body="See [[missing-target]]")
+
+        out1 = maintain.run_maintenance(vault_with_roles, "vault_manager",
+                                        roles, mode="maintain",
+                                        distribute_issues=True)
+        d = self._findings_dir(vault_with_roles)
+        first = self._names(d)
+        assert len(first) == 1
+
+        # Second run writes its own file under a distinct run_id.
+        out2 = maintain.run_maintenance(vault_with_roles, "vault_manager",
+                                        roles, mode="maintain",
+                                        distribute_issues=True)
+        # Force distinct ids even inside the same second.
+        if self._names(d) == first:
+            (d / "20260101-000000.jsonl").write_text("{}\n", encoding="utf-8")
+            out2 = maintain.run_maintenance(vault_with_roles, "vault_manager",
+                                            roles, mode="maintain",
+                                            distribute_issues=True)
+
+        remaining = self._names(d)
+        assert len(remaining) == 1, remaining
+        # The survivor is the current run's reported file.
+        assert out2["findings_file"].endswith(remaining[0])
+        assert (vault_with_roles / out2["findings_file"]).exists()
+        assert out1["findings_file"] is not None
+
+    def test_dry_run_neither_writes_nor_prunes(self, vault_with_roles, roles):
+        d = self._findings_dir(vault_with_roles)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "20260804-101010.jsonl").write_text("{}\n", encoding="utf-8")
+
+        write_note(vault_with_roles, "system", roles,
+                   path="SYSTEM/HANDBOOK/broken.md",
+                   frontmatter=_fm(), body="See [[missing-target]]")
+        out = maintain.run_maintenance(vault_with_roles, "vault_manager", roles,
+                                       mode="maintain", distribute_issues=True,
+                                       dry_run=True)
+
+        assert out["findings_file"] is None
+        assert "findings_pruned" not in out
+        assert self._names(d) == ["20260804-101010.jsonl"]
