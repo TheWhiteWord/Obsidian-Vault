@@ -294,21 +294,38 @@ def _handle_issue_resolve(args, **kw) -> str:
         if record is None:
             return {"ok": False, "error": "not_found", "key": a["key"]}
         target = record.get("target", "")
-        # Resolve requires write or meta over the target — you close issues
-        # about notes you own. Grant-kind check: write/meta are grant kinds,
-        # not operations.
+        # Acting on an issue requires write or meta over its target — you
+        # route/claim/close issues about notes you own. Grant-kind check:
+        # write/meta are grant kinds, not operations.
         grants = roles.get(agent)
         if not (grants.matches("write", target) or grants.matches("meta", target)):
             from vault.grants import PermissionDenied
             raise PermissionDenied(
-                f"{agent} may not resolve {a['key']!r}: requires 'write' or "
+                f"{agent} may not act on {a['key']!r}: requires 'write' or "
                 f"'meta' over its target {target!r}"
             )
-        return issues.resolve_issue(
-            vault_root, agent, a["key"],
-            state=a.get("state", "resolved"),
-            reason=a.get("reason"),
-        )
+        # Route (set assignee) and lifecycle (claim/close) are two actions
+        # on the same ledger. Assign leaves state untouched; the assignee
+        # profile later claims/resolves it. Both may be passed together.
+        result = {}
+        if a.get("assignee"):
+            result = issues.assign_issue(
+                vault_root, agent, a["key"], a["assignee"])
+        if a.get("state"):
+            result = issues.resolve_issue(
+                vault_root, agent, a["key"],
+                state=a["state"],
+                reason=a.get("reason"),
+            )
+        elif not a.get("assignee"):
+            # Neither action passed: default to close-resolved for backward
+            # compatibility with callers that omit state.
+            result = issues.resolve_issue(
+                vault_root, agent, a["key"],
+                state="resolved",
+                reason=a.get("reason"),
+            )
+        return result
     return _dispatch(run, args, needs_roles=True)
 
 

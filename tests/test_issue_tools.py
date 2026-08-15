@@ -169,6 +169,62 @@ class TestIssueTool:
         assert out["ok"] is False
         assert out["error"] == "permission_denied"
 
+    def test_assign_requires_ownership(self, vault_with_roles):
+        issues.create_issue(vault_with_roles, "tww",
+                            key="k|CREATIVE/PHILOSOPHY/recurrence.md",
+                            subject="s", detail="d",
+                            target="CREATIVE/PHILOSOPHY/recurrence.md")
+        # system holds write only on SYSTEM/** — cannot route a CREATIVE issue
+        out = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "system",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "assignee": "tww",
+        })
+        assert out["ok"] is False
+        assert out["error"] == "permission_denied"
+        # tww owns CREATIVE/** — can assign
+        out2 = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "assignee": "creative",
+        })
+        assert out2["result"] == "assigned"
+        rec = issues.read_issue(vault_with_roles,
+                                "k|CREATIVE/PHILOSOPHY/recurrence.md")
+        assert rec["assignee"] == "creative"
+        assert rec["state"] == "open"  # assign leaves state untouched
+
+    def test_assign_then_claim_then_resolve(self, vault_with_roles):
+        # Full routing lifecycle through the tool: manager assigns, the
+        # assignee claims, then resolves.
+        issues.create_issue(vault_with_roles, "vault_manager",
+                            key="k|CREATIVE/PHILOSOPHY/recurrence.md",
+                            subject="s", detail="d",
+                            target="CREATIVE/PHILOSOPHY/recurrence.md")
+        out = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "vault_manager",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "assignee": "tww",
+        })
+        assert out["result"] == "assigned"
+        out2 = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "state": "in_progress",
+        })
+        assert out2["result"] == "claimed"
+        out3 = _call(plugin._handle_issue_resolve, {
+            "vault": str(vault_with_roles), "agent": "tww",
+            "key": "k|CREATIVE/PHILOSOPHY/recurrence.md",
+            "state": "resolved", "reason": "done",
+        })
+        assert out3["result"] == "closed"
+        rec = issues.read_issue(vault_with_roles,
+                                "k|CREATIVE/PHILOSOPHY/recurrence.md")
+        assert rec["assignee"] == "tww"
+        assert rec["state"] == "resolved"
+        assert rec["claimed_by"] == "tww"
+
     def test_list_assigned_to_me(self, vault_with_roles):
         issues.create_issue(vault_with_roles, "vault_manager",
                             key="a|CREATIVE/PHILOSOPHY/recurrence.md",

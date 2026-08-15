@@ -848,11 +848,16 @@ CRON_JOBS: list[CronJobSpec] = [
             "- Verify also covers the README Tree drift check and the "
             "grant-anchor check; raise [maintenance] issues as the skill "
             "directs.\n"
+            "- Route the unassigned backlog: for each open [maintenance] "
+            "issue with no assignee, find the profile whose write/meta "
+            "grant covers its target (roles.yaml / peer memory) and set it "
+            "via obsidian_issue_resolve assignee=<profile>; leave unclear "
+            "or multi-owner ones for explicit triage.\n"
             "- Act within your remit only; escalate content judgments as "
             "ledger issues.\n"
             "Report in 3-5 lines: findings per check, issues "
-            "created/skipped/resolved/declined, anything needing a human. "
-            "If the sweep reports zero findings, say so in one line."
+            "created/skipped/resolved/declined/assigned, anything needing "
+            "a human. If the sweep reports zero findings, say so in one line."
         ),
     },
     {
@@ -869,11 +874,16 @@ CRON_JOBS: list[CronJobSpec] = [
             "- Verify also covers the README Tree drift check and the "
             "grant-anchor check; raise [maintenance] issues as the skill "
             "directs.\n"
+            "- Route the unassigned backlog: for each open [maintenance] "
+            "issue with no assignee, find the profile whose write/meta "
+            "grant covers its target (roles.yaml / peer memory) and set it "
+            "via obsidian_issue_resolve assignee=<profile>; leave unclear "
+            "or multi-owner ones for explicit triage.\n"
             "- Suggestions are never auto-applied: route them to the "
             "owning agent as ledger issues.\n"
             "Report in 3-5 lines: findings, suggestions, issues "
-            "created/skipped/resolved/declined; flag anything needing a "
-            "human decision."
+            "created/skipped/resolved/declined/assigned; flag anything "
+            "needing a human decision."
         ),
     },
 ]

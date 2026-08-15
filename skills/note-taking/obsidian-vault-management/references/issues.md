@@ -40,10 +40,12 @@ target): current state of every issue, newest first.
   the tag to see the backlog; on `target` for one domain.
 - **Unassigned is yours to route.** Issues with `assignee: null` and no
   clear write/meta owner are the manager's triage job: read the target's
-  grants in roles.yaml, assign to the capable owner, or resolve/decline
-  yourself when the call is yours (meta covers every target). An
-  `in_progress` issue has a holder (`claimed_by`) — respect the claim;
-  don't reassign work someone has taken.
+  grants in roles.yaml, assign to the capable owner via
+  `obsidian_issue_resolve key=<key> assignee=<profile>` (sets the assignee
+  without changing state — the owner then claims/resolves), or
+  resolve/decline yourself when the call is yours (meta covers every
+  target). An `in_progress` issue has a holder (`claimed_by`) — respect
+  the claim; don't reassign work someone has taken.
 - Pair with `obsidian_audit` for the mutation side (see
   `references/maintenance.md`).
 

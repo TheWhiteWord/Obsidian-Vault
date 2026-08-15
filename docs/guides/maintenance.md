@@ -32,8 +32,9 @@ Record fields are engine-fixed:
 | `raised_by`, `created_at`, `updated_at`, `resolved_by`, `resolved_at`, `reason` | provenance + closure |
 
 Every mutation is recorded in the audit trail
-(`issue_create`, `issue_claim`, `issue_resolve`, `issue_prune`), so full
-history lives there; the ledger file holds current state only.
+(`issue_create`, `issue_claim`, `issue_assign`, `issue_resolve`,
+`issue_prune`), so full history lives there; the ledger file holds current
+state only.
 
 ## Access — derived from grants at call time
 
@@ -41,7 +42,7 @@ history lives there; the ledger file holds current state only.
 |---|---|
 | **raise** | any registered agent (present in `roles.yaml`) — the escalation valve, audited |
 | **list** | the caller's `read` grants intersect the issue's `target` — "my issues" is a query, not a folder |
-| **claim / resolve** | `write` **or** `meta` over the `target` — you act on issues about notes you own |
+| **assign / claim / resolve** | `write` **or** `meta` over the `target` — you act on issues about notes you own |
 
 There is no routing table: the issue's `target` *is* the addressee, and
 the optional `assignee` is a SHOULD hint on top of it. The domain owner
@@ -56,8 +57,12 @@ by the wrong agent.
   Optional per item: `priority`, `tags`, `key`, `assignee` (who should
   resolve). Duplicate keys are skipped; a closed issue with the same key
   is re-opened.
-- **`obsidian_issue_resolve`** — claim with `state: in_progress`, or
-  close with `state: resolved | declined` and an optional `reason`.
+- **`obsidian_issue_resolve`** — move an issue's lifecycle: route it with
+  `assignee=<profile>` (sets who should resolve, state untouched — the
+  owner then claims/closes), claim with `state: in_progress`, or close
+  with `state: resolved | declined` and an optional `reason`. Assign,
+  claim, and resolve share the same grant gate (`write`/`meta` over the
+  target).
 - **`obsidian_issue_list`** — filter by `state` / `priority` / `tags` /
   `target` / `raised_by` / `assigned_to` (`me` = the calling agent);
   results are grant-intersected.

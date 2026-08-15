@@ -73,6 +73,7 @@ RESULT_REOPENED = "reopened"
 RESULT_NOT_FOUND = "not_found"
 RESULT_ALREADY_CLOSED = "already_closed"
 RESULT_CLOSED = "closed"
+RESULT_ASSIGNED = "assigned"
 
 
 class IssueError(Exception):
@@ -268,6 +269,45 @@ def resolve_issue(
     audit.record(root, agent, "issue_resolve", record["target"],
                  key=key, state=state, reason=reason)
     return {"result": "closed", "key": key, "state": state}
+
+
+def assign_issue(
+    vault_root: Path,
+    agent: str,
+    key: str,
+    assignee: str,
+) -> Dict[str, Any]:
+    """Route an open issue to the profile that should resolve it.
+
+    Sets ``assignee`` on an open/``in_progress`` record (a SHOULD signal —
+    never a grant gate) and records ``issue_assign`` in the audit trail.
+    The grant gate (``write``/``meta`` over the target) is enforced in the
+    tool layer; this is the record mutation + audit. Closed records are
+    refused — you do not route an issue that is done.
+    """
+    if not isinstance(assignee, str) or not assignee.strip():
+        raise IssueError(
+            f"assignee must be a non-empty profile name, got {assignee!r}")
+
+    root = Path(vault_root).resolve()
+    path = _issue_path(root, key)
+    if path is None:
+        return {"result": "no_state_dir", "key": key}
+    if not path.exists():
+        return {"result": "not_found", "key": key}
+
+    record = _read(path)
+    if record is None:
+        return {"result": "not_found", "key": key}
+    if record["state"] in ("resolved", "declined"):
+        return {"result": "already_closed", "key": key, "state": record["state"]}
+
+    clean = assignee.strip()
+    record.update(assignee=clean, updated_at=_now())
+    _atomic_write(path, record)
+    audit.record(root, agent, "issue_assign", record["target"],
+                 key=key, assignee=clean)
+    return {"result": "assigned", "key": key, "assignee": clean}
 
 
 def list_issues(

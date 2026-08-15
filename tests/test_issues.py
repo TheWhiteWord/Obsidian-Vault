@@ -231,6 +231,52 @@ class TestAssignment:
         with pytest.raises(issues.IssueError):
             self._create(vault_with_roles, assignee="")
 
+    def test_assign_sets_assignee_on_open(self, vault_with_roles):
+        self._create(vault_with_roles)  # open, assignee null
+        out = issues.assign_issue(vault_with_roles, "vault_manager",
+                                  KEY, "creative")
+        assert out["result"] == "assigned"
+        assert out["assignee"] == "creative"
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["assignee"] == "creative"
+        assert rec["state"] == "open"  # assign leaves state untouched
+        entries = audit.read_entries(vault_with_roles, action="issue_assign")
+        assert len(entries) == 1
+
+    def test_assign_reassigns_in_progress(self, vault_with_roles):
+        self._create(vault_with_roles)
+        issues.resolve_issue(vault_with_roles, "creative", KEY,
+                             state="in_progress")
+        out = issues.assign_issue(vault_with_roles, "vault_manager",
+                                  KEY, "system")
+        assert out["result"] == "assigned"
+        rec = issues.read_issue(vault_with_roles, KEY)
+        assert rec["assignee"] == "system"
+        assert rec["state"] == "in_progress"
+        assert rec["claimed_by"] == "creative"  # holder preserved
+
+    def test_assign_refuses_closed(self, vault_with_roles):
+        self._create(vault_with_roles)
+        issues.resolve_issue(vault_with_roles, "creative", KEY,
+                             state="resolved", reason="done")
+        out = issues.assign_issue(vault_with_roles, "vault_manager",
+                                  KEY, "creative")
+        assert out["result"] == "already_closed"
+
+    def test_assign_missing_key(self, vault_with_roles):
+        out = issues.assign_issue(vault_with_roles, "vault_manager",
+                                  "no|such", "creative")
+        assert out["result"] == "not_found"
+
+    def test_assign_rejects_blank_assignee(self, vault_with_roles):
+        self._create(vault_with_roles)
+        with pytest.raises(issues.IssueError):
+            issues.assign_issue(vault_with_roles, "vault_manager",
+                                KEY, "  ")
+        with pytest.raises(issues.IssueError):
+            issues.assign_issue(vault_with_roles, "vault_manager",
+                                KEY, "")
+
     def test_list_filter_by_assignee(self, vault_with_roles):
         self._create(vault_with_roles, key="a|one", assignee="creative")
         self._create(vault_with_roles, key="b|two")
