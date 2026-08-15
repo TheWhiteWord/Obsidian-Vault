@@ -28,12 +28,14 @@ leaves the ledger alone.
 ## What a run produces
 
 - **Findings file** — `.state/maintain/findings/<run_id>.jsonl`, the machine
-  interface; every finding with its nature and location.
+  interface; every finding with its nature and location. Findings files older
+  than the current run are pruned after distribution; the ledger issues are the
+  durable record.
 - **Ledger distribution** — findings become issues (`key = <check>|<path>`,
   `target = path`, `tags: [maintenance]`), deduped by key.
 - **Lifecycle pass** — auto-resolves findings whose condition cleared,
   auto-declines suggestions unanswered for 14 days, prunes records closed
-  more than 30 days.
+  more than 7 days.
 - **Checkpoint** — advanced only after a full successful run (the watermark
   for the next `delta`).
 

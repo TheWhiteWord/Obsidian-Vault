@@ -97,8 +97,10 @@ Lifecycle rules:
   "condition cleared".
 - **Suggestion TTL** — `kind: suggestion` open past 14 days is
   auto-declined ("non-action = implicit decline").
-- **Pruning** — resolved/declined issues older than 30 days are
-  deleted; the audit log keeps the history.
+- **Pruning** — resolved/declined issues older than 7 days are
+  deleted; the audit log keeps the history. Findings files older than
+  the current run are pruned after distribution; the ledger issues are
+  the durable record.
 
 The manager resolves/declines/prunes **only its own** issues
 (`raised_by` = itself); agent-raised issues are the raiser's to close.

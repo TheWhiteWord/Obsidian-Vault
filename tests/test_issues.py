@@ -338,6 +338,10 @@ class TestAssignment:
 
 
 class TestPrune:
+    def test_prune_ttl_is_seven_days(self):
+        """The closed-record pruning contract is locked at 7 days."""
+        assert issues.PRUNE_TTL_DAYS == 7
+
     def test_prune_deletes_only_old_closed(self, vault_with_roles):
         issues.create_issue(vault_with_roles, "vault_manager",
                             key="old|one", subject="Old", detail="d",

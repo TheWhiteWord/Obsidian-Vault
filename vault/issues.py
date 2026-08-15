@@ -62,7 +62,7 @@ ISSUE_NATURES = ("finding", "suggestion")
 ISSUE_PRIORITIES = ("low", "medium", "high", "critical")
 
 #: Pruning TTL for closed records (engine constant; a future config knob).
-PRUNE_TTL_DAYS = 30
+PRUNE_TTL_DAYS = 7
 
 #: Issue-operation outcome keys. Engine vocabulary — used by callers to
 #: branch on what a mutation did (the portability guard forbids the literal
