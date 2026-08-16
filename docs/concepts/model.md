@@ -125,6 +125,15 @@ Two severities, per config:
 | the registry | **generated** | human-readable view of the merged configs |
 | `.state/audit-log.jsonl` | **engine** | append-only JSONL, created on first write |
 
+An INDEX records only what is *in its own folder*: its immediate notes
+(under `## Notes`, each with its `summary_field` one-liner), and under
+`## Folders` a pointer to each immediate subfolder, expanded one level to
+show that subfolder's own direct notes and subfolders. It does not recurse
+— descent through the tree happens by following a child's INDEX — so a note
+appears in exactly one INDEX (its own folder's), never duplicated into every
+ancestor. Notes shown under `## Folders` carry their `· *type* — summary`
+suffix; subfolders render as plain links.
+
 `summary_field` is a config key naming the frontmatter field whose
 value INDEX renders as each note's one-line summary, so notes are
 triageable without opening them. Advisory, never required — the field

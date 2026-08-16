@@ -17,8 +17,14 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from .config import ResolvedConfig, resolve_config
-from .constants import CONFIG_DIRNAME, GENERATED_MARKER, SKIP_DIRS, SUMMARY_FIELD_KEY
-from .notes import Note, derive_tags, derive_vocabulary, iter_notes
+from .constants import (
+    CONFIG_DIRNAME,
+    GENERATED_MARKER,
+    MARKDOWN_SUFFIX,
+    SKIP_DIRS,
+    SUMMARY_FIELD_KEY,
+)
+from .notes import Note, derive_tags, derive_vocabulary, iter_notes, parse_note
 from .paths import relative_to_vault, safe_join
 
 logger = logging.getLogger(__name__)
@@ -62,62 +68,118 @@ def _header(title: str) -> List[str]:
 # INDEX
 # ---------------------------------------------------------------------------
 
-def _group_by_subfolder(
-    notes: List[Note], folder_rel: str
-) -> Dict[str, List[Note]]:
-    groups: Dict[str, List[Note]] = {}
-    prefix = f"{folder_rel}/" if folder_rel else ""
-    for note in notes:
-        remainder = note.path[len(prefix):] if prefix else note.path
-        parts = remainder.split("/")
-        key = "" if len(parts) == 1 else parts[0]
-        groups.setdefault(key, []).append(note)
-    return groups
+def _immediate_notes(vault_root: Path, target: Path) -> List[Note]:
+    """Notes whose file lives directly inside ``target`` (depth 1 only).
+
+    An INDEX documents *its own* folder, not the whole subtree — each deeper
+    folder carries its own INDEX, so descent is by wikilink, not by inlining.
+    Subfolders are reported separately (see ``_child_folders``) so a folder's
+    INDEX lists notes here plus pointers to its children, never its children's
+    contents.
+    """
+    root = Path(vault_root).resolve()
+    notes: List[Note] = []
+    skip = SKIP_DIRS
+    for entry in sorted(target.iterdir()):
+        if not entry.is_file() or entry.suffix != MARKDOWN_SUFFIX:
+            continue
+        if entry.name == INDEX_FILENAME:
+            continue
+        if skip & set(entry.relative_to(root).parts):
+            continue
+        notes.append(parse_note(entry, root))
+    return notes
+
+
+def _child_folders(vault_root: Path, target: Path) -> List[str]:
+    """Immediate subfolder names, in render order.
+
+    Every direct subfolder is a pointer — descent through the tree happens by
+    following each child's own INDEX, so a folder's INDEX must name *all* its
+    children even when a child holds no notes of its own yet. Omitting
+    "empty" subfolders would hide branches that exist but are sparsely
+    populated, and (worse) depended on the child's INDEX.md already existing,
+    which broke during a top-down bulk regen where parents are written first.
+    """
+    root = Path(vault_root).resolve()
+    skip = SKIP_DIRS
+    children: List[str] = []
+    for entry in sorted(target.iterdir()):
+        if not entry.is_dir():
+            continue
+        if skip & set(entry.relative_to(root).parts):
+            continue
+        children.append(entry.name)
+    return children
+
+
+def _format_note_line(note: Note, cfg) -> str:
+    """The ``- [[title]] · *type* — summary`` line for one note."""
+    extras = " ".join(
+        f"· *{note.frontmatter[fn]}*"
+        for fn in cfg.vocabulary_fields()
+        if isinstance(note.frontmatter.get(fn), str)
+        and not fn.endswith("tags")
+    )
+    summary = ""
+    if cfg.summary_field:
+        value = note.frontmatter.get(cfg.summary_field)
+        if isinstance(value, str) and value.strip():
+            summary = f" — {value.strip()}"
+    suffix = f" {extras}{summary}" if (extras or summary) else ""
+    return f"- [[{note.title}]]{suffix}"
 
 
 def build_index(vault_root: Path, folder: str) -> str:
-    """Render the INDEX for one folder. Pure — writes nothing."""
+    """Render the INDEX for one folder. Pure — writes nothing.
+
+    The index records only what is *in this folder*: the notes at its own
+    level, and pointers to its immediate subfolders (each of which carries its
+    own INDEX). It does not recurse — descent through the tree happens by
+    following a child's INDEX, so a note appears in exactly one INDEX (its own
+    folder's) instead of being duplicated into every ancestor.
+    """
     root = Path(vault_root).resolve()
     target = safe_join(root, folder)
     rel = relative_to_vault(root, target)
     cfg = resolve_config(root, target)
 
-    notes = [n for n in iter_notes(root, scope=target)
-             if Path(n.path).name != INDEX_FILENAME]
+    notes = _immediate_notes(root, target)
+    subfolders = _child_folders(root, target)
 
     title = Path(rel).name if rel else root.name
     lines = _header(f"{title}")
 
-    if not notes:
-        lines += ["*No notes yet.*", ""]
+    if not notes and not subfolders:
+        lines += [f"*No notes yet.*", ""]
         return "\n".join(lines)
 
     lines += [f"**{len(notes)} notes**", ""]
 
-    groups = _group_by_subfolder(notes, rel)
-
-    for key in sorted(groups, key=lambda k: (k == "", k)):
-        group = sorted(groups[key], key=lambda n: n.title.lower())
-        if key:
-            lines += [f"## {key}", ""]
-
-        for note in group:
-            extras = " ".join(
-                f"· *{note.frontmatter[fn]}*"
-                for fn in cfg.vocabulary_fields()
-                if isinstance(note.frontmatter.get(fn), str)
-                and not fn.endswith("tags")
-            )
-            summary = ""
-            if cfg.summary_field:
-                value = note.frontmatter.get(cfg.summary_field)
-                if isinstance(value, str) and value.strip():
-                    summary = f" — {value.strip()}"
-            suffix = f" {extras}{summary}" if (extras or summary) else ""
-            lines.append(f"- [[{note.title}]]{suffix}")
+    # Child folders first — the tree descends through them. Each folder is
+    # expanded one level so the reader sees what it immediately contains
+    # (its own notes and its subfolders) without the index recursing.
+    if subfolders:
+        lines += ["## Folders", ""]
+        for name in subfolders:
+            lines.append(f"- [[{name}]]")
+            child_dir = target / name
+            child_notes = _immediate_notes(root, child_dir)
+            child_subs = _child_folders(root, child_dir)
+            for cn in sorted(child_notes, key=lambda n: n.title.lower()):
+                lines.append(f"    {_format_note_line(cn, cfg)}")
+            for cs in child_subs:
+                lines.append(f"    - [[{cs}]]")
         lines.append("")
 
-    # Derived tag cloud — the folder's actual vocabulary, not a declared one.
+    # Then the notes that physically live in this folder.
+    if notes:
+        lines += ["## Notes", ""]
+        for note in sorted(notes, key=lambda n: n.title.lower()):
+            lines.append(_format_note_line(note, cfg))
+        lines.append("")
+
+    # Derived tag cloud — this folder's own vocabulary, not a declared one.
     tags = derive_tags(notes)
     if tags:
         lines += ["## Tags", "",
@@ -150,15 +212,22 @@ def regenerate_indexes(
     vault_root: Path,
     scope: Optional[str] = None,
 ) -> List[str]:
-    """Regenerate INDEX for every folder containing notes, under ``scope``."""
+    """Regenerate INDEX for every folder under ``scope``.
+
+    Enumerates *every* directory (not just those with direct notes): a folder
+    that is purely a container of subfolders still needs a correct INDEX
+    listing its child folders — and one that has gone content-free still needs
+    its stale INDEX refreshed to "*No notes yet.*". Skipping such folders would
+    leave the old recursive output (which inlined descendants) in place.
+    """
     root = Path(vault_root).resolve()
     base = safe_join(root, scope) if scope else root
 
     folders = {
-        p.parent for p in base.rglob("*.md")
-        if not (SKIP_DIRS & set(p.relative_to(root).parts))
-        and p.name != INDEX_FILENAME
+        p for p in base.rglob("*")
+        if p.is_dir() and not (SKIP_DIRS & set(p.relative_to(root).parts))
     }
+    folders.add(base)  # the scope root itself needs an INDEX too
 
     written: List[str] = []
     for folder in sorted(folders):

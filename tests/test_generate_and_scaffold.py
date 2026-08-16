@@ -71,7 +71,107 @@ class TestIndexContent:
         write_index(vault, "CREATIVE/PHILOSOPHY")
         text = build_index(vault, "CREATIVE/PHILOSOPHY")
         assert "[[INDEX]]" not in text
-        assert "**2 notes**" in text        # not 3
+        assert "**2 notes**" in text        # immediate-level notes, not the subtree
+
+    def test_index_lists_only_immediate_notes_not_descendants(self, vault):
+        # A note two levels deep must NOT appear at the parent's top level.
+        # (It may appear nested one level in, under its own folder pointer —
+        # that is the intended one-level expansion — but never loose here.)
+        (vault / "CREATIVE/PHILOSOPHY/deep").mkdir(parents=True)
+        (vault / "CREATIVE/PHILOSOPHY/deep/buried.md").write_text(
+            "---\ntype: work\nkind: [essay]\nstatus: draft\ntags: [x]\n"
+            "created: 2026-08-02\n---\nBody.\n"
+        )
+        text = build_index(vault, "CREATIVE/PHILOSOPHY")
+        # bare top-level entry (not indented under a folder) must be absent
+        assert "\n- [[buried]]" not in ("\n" + text)
+        assert "**2 notes**" in text          # still only the two at this level
+
+    def test_index_points_to_child_folders(self, vault):
+        (vault / "CREATIVE/PHILOSOPHY/sub").mkdir()
+        (vault / "CREATIVE/PHILOSOPHY/sub/leaf.md").write_text(
+            "---\ntype: work\nkind: [essay]\nstatus: draft\ntags: [x]\n"
+            "created: 2026-08-02\n---\nBody.\n"
+        )
+        text = build_index(vault, "CREATIVE/PHILOSOPHY")
+        assert "## Folders" in text
+        assert "- [[sub]]" in text             # child folder is a pointer
+        # the child's note appears nested one level in, not as a top-level entry
+        assert "\n- [[leaf]]" not in ("\n" + text)
+        assert "    - [[leaf]]" in text
+
+    def test_index_expands_child_folder_one_level(self, vault):
+        # A child folder's first-level contents (its notes AND its own
+        # subfolders) should appear nested under its pointer — but nothing
+        # deeper, so the index still does not recurse.
+        sub = vault / "CREATIVE/PHILOSOPHY/sub"
+        sub.mkdir()
+        (sub / "leaf.md").write_text(
+            "---\ntype: work\nkind: [essay]\nstatus: draft\ntags: [x]\n"
+            "created: 2026-08-02\n---\nBody.\n"
+        )
+        (sub / "grandchild").mkdir()
+        (sub / "grandchild/deep.md").write_text(
+            "---\ntype: work\nkind: [essay]\nstatus: draft\ntags: [x]\n"
+            "created: 2026-08-02\n---\nBody.\n"
+        )
+        text = build_index(vault, "CREATIVE/PHILOSOPHY")
+        assert "- [[sub]]" in text
+        assert "    - [[leaf]]" in text           # child's note, one level in
+        assert "    - [[grandchild]]" in text     # child's subfolder, one level in
+        assert "[[deep]]" not in text             # NOT two levels deep
+
+    def test_index_lists_every_subfolder_not_just_note_bearing_ones(self, vault):
+        # A subfolder with no notes of its own must still appear as a pointer.
+        (vault / "CREATIVE/PHILOSOPHY/empty").mkdir()
+        text = build_index(vault, "CREATIVE/PHILOSOPHY")
+        assert "## Folders" in text
+        assert "- [[empty]]" in text            # sparsely populated branch shown
+
+    def test_index_with_only_folders_is_not_empty(self, vault):
+        # No notes added here, but a child with content: not "No notes yet",
+        # and the child still appears as a folder pointer.
+        (vault / "CREATIVE/PHILOSOPHY/onlychild").mkdir()
+        (vault / "CREATIVE/PHILOSOPHY/onlychild/leaf.md").write_text(
+            "---\ntype: work\nkind: [essay]\nstatus: draft\ntags: [x]\n"
+            "created: 2026-08-02\n---\nBody.\n"
+        )
+        text = build_index(vault, "CREATIVE/PHILOSOPHY")
+        assert "No notes yet" not in text
+        # the 2 pre-existing notes at this level are still counted
+        assert "**2 notes**" in text
+        assert "## Folders" in text
+        assert "- [[onlychild]]" in text
+
+    def test_regenerate_refreshes_container_folders_without_direct_notes(self, vault):
+        # A parent folder holding only subfolders (no direct notes) must still
+        # get its INDEX regenerated — otherwise a stale recursive INDEX that
+        # inlined descendants would survive the rollout.
+        child = vault / "CREATIVE/PHILOSOPHY/child"
+        child.mkdir(parents=True)
+        (child / "leaf.md").write_text(
+            "---\ntype: work\nkind: [essay]\nstatus: draft\ntags: [x]\n"
+            "created: 2026-08-02\n---\nBody.\n"
+        )
+        # Seed a stale recursive-style INDEX that inlines the descendant.
+        (vault / "CREATIVE/PHILOSOPHY/INDEX.md").write_text(
+            "<!-- generated: do not edit -->\n# PHILOSOPHY\n**1 notes**\n"
+            "## child\n- [[leaf]]\n"
+        )
+        from vault.generate import regenerate_indexes, write_index
+        write_index(vault, "CREATIVE/PHILOSOPHY")  # single-folder path
+        text = (vault / "CREATIVE/PHILOSOPHY/INDEX.md").read_text()
+        # child's leaf appears nested one level in (under [[child]]), not as a
+        # loose top-level entry, and the stale recursive inline is gone.
+        assert "\n- [[leaf]]" not in ("\n" + text)
+        assert "    - [[leaf]]" in text
+        assert "## Folders" in text
+        assert "- [[child]]" in text
+
+        # And the bulk regenerate must also touch container folders,
+        # including the scoped root itself.
+        written = regenerate_indexes(vault, "CREATIVE/PHILOSOPHY")
+        assert any("CREATIVE/PHILOSOPHY/INDEX.md" == p for p in written)
 
     def test_regenerate_covers_every_note_folder(self, vault):
         written = regenerate_indexes(vault)
