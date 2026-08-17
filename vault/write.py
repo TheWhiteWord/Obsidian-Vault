@@ -34,6 +34,15 @@ logger = logging.getLogger(__name__)
 def _refresh_index(vault_root: Path, folder: Path) -> None:
     """Regenerate the containing folder's INDEX after a mutation (§6).
 
+    Also regenerates every ancestor up to the root: a new folder must appear
+    in its parent's INDEX (the parent lists its children), and that change
+    must propagate upward. A note written into a brand-new subtree (e.g.
+    ``work/graphic/image/note.md``) creates ``image/`` on disk via mkdir, so
+    only refreshing the note's immediate parent would leave ``work/graphic``
+    stale and the new branch invisible in the README tree. ``reindex_ancestors``
+    covers the folder and all ancestors — strictly a superset of the prior
+    single-folder refresh.
+
     Never raises: a note was written successfully, and a failure to regenerate
     a derived view must not be reported as a failed write. The next
     regeneration repairs it.
@@ -42,10 +51,8 @@ def _refresh_index(vault_root: Path, folder: Path) -> None:
     not content, and must never carry a content-derived INDEX of themselves.
     """
     try:
-        if CONFIG_DIRNAME in folder.parts or STATE_DIRNAME in folder.parts:
-            return
-        from .generate import write_index
-        write_index(vault_root, relative_to_vault(vault_root, folder))
+        from .generate import reindex_ancestors
+        reindex_ancestors(vault_root, relative_to_vault(vault_root, folder))
     except Exception:
         logger.warning("index regeneration failed", exc_info=True)
 

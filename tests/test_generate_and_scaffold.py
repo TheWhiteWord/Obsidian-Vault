@@ -223,6 +223,19 @@ class TestWriteRefreshesIndex:
         text = (vault_with_roles / "CREATIVE/PHILOSOPHY/INDEX.md").read_text()
         assert "[[fresh]]" in text
 
+    def test_note_into_new_subtree_refreshes_grandparent(self, vault_with_roles, roles):
+        # The real failure mode: an agent writes a note into a brand-new
+        # subtree (work/graphic/image/note.md). The write path mkdir's the
+        # whole tree, so only refreshing the note's immediate parent would
+        # leave work/graphic/INDEX.md stale and the new 'image' branch
+        # invisible in the README tree. The grandparent must be refreshed too.
+        write_note(vault_with_roles, "tww", roles,
+                   "CREATIVE/PHILOSOPHY/deep/newbranch/note.md", FM, "Body.")
+        grandparent = (vault_with_roles / "CREATIVE/PHILOSOPHY/INDEX.md").read_text()
+        assert "[[deep]]" in grandparent
+        assert "[[newbranch]]" in (
+            vault_with_roles / "CREATIVE/PHILOSOPHY/deep/INDEX.md").read_text()
+
     def test_index_updates_after_a_delete(self, vault_with_roles, roles):
         from vault.write import delete_note
         write_note(vault_with_roles, "tww", roles,
