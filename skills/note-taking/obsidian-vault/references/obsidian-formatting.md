@@ -4,12 +4,17 @@ The Markdown syntax the vault uses.
 
 ## Wikilinks
 
-- `[[Note Name]]` — link to a note by name.
+- `[[Note Name]]` — link to a note by **title** (its frontmatter `title:`, case-insensitive), not by filename. `[[prompts.md]]` will not match a note titled "Image Prompt Playbook" — link by the title, or use a path-qualified form.
 - `[[Note Name|display text]]` — alias the link text.
 - `[[Note Name#Heading]]` — link to a section.
 - `[[Note Name#^blockid]]` — link to a block reference.
+- `[[folder/note]]` or `[[../sibling]]` — path-qualified link (use `/` or `..`); resolves to the file at that vault-relative path. Use this when the target's title is ambiguous or you mean a specific file.
 - The graph's edges come from `[[...]]` in note bodies (`obsidian_graph`).
   Link generously; keep links meaningful.
+- Links to generated files (`INDEX`, the registry) are not graph nodes and
+  may appear under `obsidian_graph ... dangling: true` — that is expected, not
+  a broken link; ignore it. Genuine dangling means a note you meant to create
+  or link by the wrong title/path.
 
 ## Embeds
 

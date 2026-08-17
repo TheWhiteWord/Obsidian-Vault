@@ -84,6 +84,32 @@ class TestPathAwareResolution:
         assert ("SRC/linker.md", "no-such-note") in g.dangling
         assert g.ambiguous == []
 
+    def test_link_to_generated_or_real_file_is_not_dangling(self, tmp_path):
+        # The graph's node set is notes only, so a link to a generated file
+        # (INDEX) or any real on-disk .md looks unresolved. Such a link is NOT
+        # a broken link and must not be reported as dangling — only a link to
+        # a note that truly does not exist on disk should be.
+        # A generated INDEX at the root:
+        _write(tmp_path / "INDEX.md",
+               "<!-- generated: do not edit -->\n# vault\n")
+        # Another generated INDEX under system/ (path-qualified target):
+        _write(tmp_path / "system/INDEX.md",
+               "<!-- generated: do not edit -->\n# system\n")
+        # Source note linking to both generated files:
+        _write(tmp_path / "README.md",
+               _FM + "Map: [[system/INDEX]] and [[INDEX]].\n")
+
+        g = _build(tmp_path)
+        dangling_labels = {l for _, l in g.dangling}
+        assert "system/INDEX" not in dangling_labels
+        assert "INDEX" not in dangling_labels
+
+        # Control: a link to a note that does not exist on disk is still
+        # dangling (behavior preserved).
+        _write(tmp_path / "SRC/linker.md", _FM + "See [[ghost-note]].\n")
+        g2 = _build(tmp_path)
+        assert ("SRC/linker.md", "ghost-note") in g2.dangling
+
 
 class TestMaintainDuplicateGuidance:
     def test_duplicate_finding_says_disambiguate_not_merge(self, tmp_path):

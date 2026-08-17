@@ -28,7 +28,8 @@ from .notes import Note, iter_notes
 class Graph:
     """An in-memory wikilink graph for one vault."""
 
-    def __init__(self, notes: Iterable[Note]):
+    def __init__(self, notes: Iterable[Note], vault_root: Optional[Path] = None):
+        self.vault_root = Path(vault_root).resolve() if vault_root else None
         self.notes: List[Note] = [n for n in notes if not n.error]
         self._by_title: Dict[str, List[Note]] = {}
         for n in self.notes:
@@ -77,8 +78,45 @@ class Graph:
                 self.outgoing[n.path].append((target_path, label.strip()))
                 if target_path:
                     self.incoming[target_path].append(n.path)
-                else:
+                elif not self._dangling_target_exists(n.path, label.strip()):
+                    # The graph excludes generated files (INDEX) as nodes, so
+                    # a link to one reads as dangling even though the file is
+                    # real on disk. Don't flag a link whose target resolves to
+                    # an actual file — it is not a broken link. Mirrors the
+                    # maintenance census guard (maintain._dangling_target_exists).
                     self.dangling.append((n.path, label.strip()))
+
+    def _dangling_target_exists(self, src_path: str, label: str) -> bool:
+        """True if a dangling link's target resolves to a real file on disk.
+
+        The graph builds its node set only from notes, so generated/derived
+        files (``INDEX.md``, the registry) are absent and any link to them
+        looks broken. A link that resolves to an on-disk ``.md`` is not a
+        broken link and must not be reported as dangling. Mirrors the
+        maintenance sweep's own guard: path-qualified resolution
+        (folder-relative, vault-root-relative, suffix match), then a
+        title-keyed note path.
+        """
+        if self.vault_root is None:
+            return False
+        root = self.vault_root
+        label = label.strip().lstrip("/")
+        if not label:
+            return False
+        parent = str(Path(src_path).parent)
+        norm = lambda p: os.path.normpath(p).replace(os.sep, "/")
+        candidates = [norm(str(Path(parent) / label)), norm(label)]
+        for cand in candidates:
+            for try_p in (cand, cand + ".md"):
+                if (root / try_p).is_file():
+                    return True
+        suffix = label.rstrip("/")
+        for note in self.notes:
+            p = note.path
+            if p == suffix or p.endswith("/" + suffix) \
+                    or p == suffix + ".md" or p.endswith("/" + suffix + ".md"):
+                return True
+        return False
 
     def _resolve_path(self, src_path: str, label: str) -> Optional[Note]:
         """Resolve a path-qualified wikilink label the way Obsidian does.
@@ -162,4 +200,4 @@ def build_graph(vault_root: Path, notes: Optional[Iterable[Note]] = None) -> Gra
     vault_root = Path(vault_root).resolve()
     if notes is None:
         notes = iter_notes(vault_root)
-    return Graph(notes)
+    return Graph(notes, vault_root)
