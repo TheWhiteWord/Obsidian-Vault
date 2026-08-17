@@ -275,8 +275,9 @@ def _soul_block(role: str) -> str:
         "contributor": (
             "## Inter-agent awareness\n"
             "- Peer discovery: `hermes profile list` (every profile — "
-            "vault-bound or not), `--role list` (roles.yaml) — domain + "
-            "grants for those that own one.\n"
+            "vault-bound or not), `python3 scripts/roles.py --vault <vault> "
+            "--role list` (reads `.vault/roles.yaml`) — domain + grants for "
+            "those that own one.\n"
             "- Memory: keep the peer/role list current — verify at session "
             "start with the discovery calls; the note is essential, never "
             "erase it.\n"
@@ -289,8 +290,9 @@ def _soul_block(role: str) -> str:
         "manager": (
             "## Inter-agent awareness\n"
             "- Peer discovery: `hermes profile list` (every profile — "
-            "vault-bound or not), `--role list` (roles.yaml) — domain + "
-            "grants for those that own one.\n"
+            "vault-bound or not), `python3 scripts/roles.py --vault <vault> "
+            "--role list` (reads `.vault/roles.yaml`) — domain + grants for "
+            "those that own one.\n"
             "- Memory: keep the peer/role list current — verify at session "
             "start with the discovery calls; the note is essential, never "
             "erase it.\n"
@@ -303,8 +305,9 @@ def _soul_block(role: str) -> str:
         "combined": (
             "## Inter-agent awareness\n"
             "- Peer discovery: `hermes profile list` (every profile — "
-            "vault-bound or not), `--role list` (roles.yaml) — domain + "
-            "grants for those that own one.\n"
+            "vault-bound or not), `python3 scripts/roles.py --vault <vault> "
+            "--role list` (reads `.vault/roles.yaml`) — domain + grants for "
+            "those that own one.\n"
             "- Memory: keep the peer/role list current — verify at session "
             "start with the discovery calls; the note is essential, never "
             "erase it.\n"
@@ -668,7 +671,7 @@ def seed_profile_config(hermes_home: Path, name: str) -> bool:
 #: never erase); this note is the fact that converges.
 PEER_MEMORY_SEED = (
     "Peers and roles: none available yet — discover with `hermes profile "
-    "list` / `--role list` (roles.yaml) at session start; keep this note "
+    "list` / `python3 scripts/roles.py --vault <vault> --role list` (reads `.vault/roles.yaml`) at session start; keep this note "
     "current (essential, never erase)."
 )
 

@@ -7,8 +7,8 @@ preset.
 ## Finding the peer
 
 - Resolve **who** by role/grant, never by profile name: for vault work, the
-  profile holding the grant over the target domain (`--role list` /
-  `roles.yaml`); otherwise `hermes profile list` / `show` for what exists and
+  profile holding the grant over the target domain
+  (`python3 scripts/roles.py --vault <vault> --role list`, reads `.vault/roles.yaml`); otherwise `hermes profile list` / `show` for what exists and
   what each profile is for.
 - If the profile that can do the work is the one you run as, do it yourself.
 

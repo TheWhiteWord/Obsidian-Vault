@@ -14,8 +14,7 @@ It is static — it never lists handoffs; it points at discovery.
 ## Finding the peer
 
 - Resolve **who** by role/grant, never by profile name: for vault work,
-  the profile holding the grant over the target domain (`--role list` /
-  `roles.yaml`); otherwise `hermes profile list` / `show` for what
+  the profile holding the grant over the target domain (`python3 scripts/roles.py --vault <vault> --role list`, reads `.vault/roles.yaml`); otherwise `hermes profile list` / `show` for what
   exists and what each profile is for.
 - If the profile that can do the work is the one you run as, do it
   yourself.
@@ -104,7 +103,7 @@ universal things:
 
 - A `## Inter-agent awareness` section in every bound profile's
   SOUL.md: peer discovery (`hermes profile list` covers every profile,
-  vault-bound or not; `--role list` adds domains + grants), the memory
+  vault-bound or not; `python3 scripts/roles.py --vault <vault> --role list` (reads `.vault/roles.yaml`) adds domains + grants), the memory
   contract (keep the peer/role list current, never erase), the
   transport, and the registry pointer.
 - A memory seed in `<profile>/memories/MEMORY.md` ("Peers and roles:
