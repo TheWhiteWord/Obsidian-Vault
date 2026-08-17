@@ -79,9 +79,7 @@ optionally per scope, loaded via `obsidian_conventions`.
 - Confirm the write result — a refusal carries errors and suggestions; honor
   them rather than forcing `overwrite`.
 - If you created links, check `obsidian_graph` dangling output for breakage you
-  introduced. (Links to generated files like `INDEX`/`registry` show as
-  dangling there by design — ignore those; only chase links to notes that
-  don't exist.)
+  introduced.
 
 ## Path handling
 
