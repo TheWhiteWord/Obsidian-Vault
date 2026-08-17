@@ -25,12 +25,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from .config import resolve_config
-from .generate import write_index
+from .generate import write_index, INDEX_FILENAME, _child_folders, is_generated
 from .grants import RoleRegistry
 from .ownership import owner_of
 from .notes import Note, derive_vocabulary, iter_notes
@@ -281,6 +282,77 @@ def _check_case_collisions(root: Path) -> List[Dict[str, Any]]:
     return findings
 
 
+def _check_stale_index(vault_root: Path) -> List[Dict[str, Any]]:
+    """Folders whose INDEX does not list their real children.
+
+    An INDEX is a derived view: it must name every immediate subfolder (see
+    ``generate._child_folders``) so descent through the tree follows each
+    child's own INDEX. When a folder is created and its parent's INDEX is
+    never regenerated — the only path that previously did this — the parent
+    keeps the old child list and the new branch is invisible in the README
+    tree. This census check catches that drift for *any* creation site, not
+    just the two the birth-moment fix covers.
+
+    Detection only: the manager files a finding and never rewrites the INDEX
+    itself (it does not edit content). ``reindex_ancestors`` is the repair,
+    run at creation time and on demand via ``regenerate_indexes``.
+
+    A folder with no INDEX at all is not "stale" — it is simply absent, and
+    regeneration covers it; this check only flags a wrong *existing* view.
+    """
+    from .constants import SKIP_DIRS
+
+    root = Path(vault_root).resolve()
+    findings: List[Dict[str, Any]] = []
+    for entry in root.rglob("*"):
+        if not entry.is_dir() or entry.name == INDEX_FILENAME:
+            continue
+        if SKIP_DIRS & set(entry.relative_to(root).parts):
+            continue
+        index_file = entry / INDEX_FILENAME
+        if not index_file.is_file() or not is_generated(index_file):
+            continue
+        actual = set(_child_folders(root, entry))
+        listed = set(_folders_listed_in(index_file))
+        missing = actual - listed
+        if missing:
+            rel = relative_to_vault(root, entry)
+            findings.append(_finding(
+                "stale_index", rel, "medium",
+                f"INDEX lists {len(listed)} folder(s) but the directory has "
+                f"{len(actual)}; missing: {', '.join(sorted(missing))}",
+                "Regenerate this folder's INDEX (obsidian_index), or ask the "
+                "manager to refresh the tree"))
+    return findings
+
+
+def _folders_listed_in(index_file: Path) -> List[str]:
+    """Immediate subfolder names a generated INDEX declares under '## Folders'.
+
+    The INDEX renders every child as ``- [[name]]`` (and one level of nested
+    notes/subs under it); a child folder name is therefore any ``[[name]]``
+    that is a *top-level* bullet in the Folders section — i.e. not indented.
+    Indented bullets are a child's own contents, not this folder's children.
+    """
+    in_folders = False
+    names: List[str] = []
+    for line in index_file.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            in_folders = stripped[3:].strip().lower() == "folders"
+            continue
+        if not in_folders:
+            continue
+        # Top-level bullet only: no leading whitespace before the '-'.
+        if not line.startswith("- "):
+            continue
+        # Extract the first [[wikilink]] target on the bullet.
+        m = re.match(r"- \[\[([^\]]+)\]\]", line)
+        if m:
+            names.append(m.group(1))
+    return names
+
+
 def _parent_has_case_collision(vault_root: Path, parent_rel: str) -> bool:
     """True when ``parent_rel`` still contains case-colliding siblings.
 
@@ -443,7 +515,11 @@ def _dangling_target_exists(vault_root: Path, src_path: str, label: str) -> bool
 
 def run_census(vault_root: Path) -> List[Dict[str, Any]]:
     """Full-vault B1: dangling, orphans, malformed, empty, missing fields,
-    case-colliding folders."""
+    case-colliding folders.
+
+    Plus ``stale_index``: a generated INDEX whose child list no longer
+    matches the directory (a new folder went unreflected in its parent).
+    """
     root = Path(vault_root).resolve()
     notes = list(iter_notes(root))
     g = graph_mod.build_graph(root, notes)
@@ -451,6 +527,7 @@ def run_census(vault_root: Path) -> List[Dict[str, Any]]:
 
     findings: List[Dict[str, Any]] = []
     findings.extend(_check_case_collisions(root))
+    findings.extend(_check_stale_index(root))
     for from_path, label in g.dangling:
         # A link whose target exists on disk is not a broken link — the graph
         # simply does not track generated files (e.g. INDEX) as nodes, so a

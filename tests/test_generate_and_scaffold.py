@@ -13,6 +13,7 @@ from vault.generate import (
     build_registry,
     is_generated,
     regenerate_indexes,
+    reindex_ancestors,
     write_index,
     write_registry,
 )
@@ -179,6 +180,27 @@ class TestIndexContent:
         assert any("CREATIVE/KNOWLEDGE" in p for p in written)
 
 
+class TestReindexAncestors:
+    def test_reindexes_folder_and_every_ancestor(self, vault):
+        # Plant a folder without any INDEX regeneration.
+        (vault / "CREATIVE/PHILOSOPHY/deep/leaf").mkdir(parents=True)
+        # No INDEX files exist yet anywhere under the new branch.
+        assert not (vault / "CREATIVE/PHILOSOPHY/deep/INDEX.md").exists()
+        # Reindexing the leaf regenerates the leaf AND each ancestor up to
+        # the scoped root it resolves within.
+        written = reindex_ancestors(vault, "CREATIVE/PHILOSOPHY/deep/leaf")
+        assert "CREATIVE/PHILOSOPHY/deep/leaf/INDEX.md" in written
+        assert "CREATIVE/PHILOSOPHY/deep/INDEX.md" in written
+        assert "CREATIVE/PHILOSOPHY/INDEX.md" in written
+        # Ancestor INDEX now lists the new child.
+        assert "[[deep]]" in (vault / "CREATIVE/PHILOSOPHY/INDEX.md").read_text()
+
+    def test_reindex_is_never_fatal(self, vault):
+        # A nonexistent folder returns [] rather than raising — callers must
+        # not have their operation fail because a derived view missed.
+        assert reindex_ancestors(vault, "CREATIVE/DOES-NOT-EXIST") == []
+
+
 class TestRegistry:
     def test_describes_reality_not_intent(self, vault):
         text = build_registry(vault)
@@ -318,6 +340,34 @@ class TestScaffoldGrants:
         with pytest.raises(PermissionDenied):
             scaffold_folder(vault_with_roles, "vault_manager", roles,
                             "CREATIVE/NEW", confirm=True)
+
+    def test_scaffold_refreshes_parent_index(self, vault_with_roles, roles):
+        # Creating a nested folder must update the PARENT's INDEX so the new
+        # child is listed — previously only the new folder's own INDEX was
+        # regenerated, leaving the parent stale (the work/INDEX gap).
+        from vault.generate import write_index
+        # Seed the parent's INDEX in its current (pre-child) state.
+        write_index(vault_with_roles, "CREATIVE")
+        parent_idx = vault_with_roles / "CREATIVE/INDEX.md"
+        assert parent_idx.is_file()
+        assert "NEWCHILD" not in parent_idx.read_text()
+        scaffold_folder(vault_with_roles, "tww", roles,
+                        "CREATIVE/NEWCHILD", confirm=True)
+        refreshed = (vault_with_roles / "CREATIVE/INDEX.md").read_text()
+        assert "[[NEWCHILD]]" in refreshed
+        # And the new child's own INDEX exists.
+        assert (vault_with_roles / "CREATIVE/NEWCHILD/INDEX.md").is_file()
+
+    def test_scaffold_refreshes_all_ancestors(self, vault_with_roles, roles):
+        # A deeply nested scaffold reaches every ancestor's INDEX, up to root.
+        scaffold_folder(vault_with_roles, "tww", roles,
+                        "CREATIVE/A/B/C", confirm=True)
+        for ancestor in ("CREATIVE/A", "CREATIVE/A/B", "CREATIVE/A/B/C"):
+            assert (vault_with_roles / f"{ancestor}/INDEX.md").is_file()
+        # CREATIVE/INDEX.md lists A; CREATIVE/A/INDEX.md lists B; etc.
+        assert "[[A]]" in (vault_with_roles / "CREATIVE/INDEX.md").read_text()
+        assert "[[B]]" in (vault_with_roles / "CREATIVE/A/INDEX.md").read_text()
+        assert "[[C]]" in (vault_with_roles / "CREATIVE/A/B/INDEX.md").read_text()
 
     def test_agent_cannot_scaffold_outside_its_tree(self, vault_with_roles, roles):
         with pytest.raises(PermissionDenied):

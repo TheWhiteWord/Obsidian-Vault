@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 from . import audit
 from .config import ConfigError, ResolvedConfig, config_chain, resolve_config
 from .constants import CONFIG_DIRNAME, CONFIG_FILENAME, ROLES_FILENAME, VOCABULARY_FLAG
-from .generate import write_index
+from .generate import reindex_ancestors
 from .grants import RoleRegistry
 from .paths import VaultPathError, relative_to_vault, safe_join
 
@@ -188,7 +188,7 @@ def scaffold_folder(
 
     index = None
     try:
-        index = write_index(root, rel)
+        index = reindex_ancestors(root, rel)
     except FileExistsError as exc:
         logger.warning("index not written: %s", exc)
 

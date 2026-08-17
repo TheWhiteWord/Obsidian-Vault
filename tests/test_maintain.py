@@ -171,6 +171,38 @@ Alone in the vault.
                    for f in findings)
 
 
+class TestStaleIndex:
+    def test_census_flags_index_missing_a_new_child(self, vault_with_roles, roles):
+        # Simulate the pre-fix drift: a folder exists on disk but its parent
+        # INDEX predates it and never listed it. CREATIVE/PHILOSOPHY is a
+        # seeded fixture folder; we write a stale CREATIVE/INDEX.md that
+        # predates the new branch.
+        # Seed a stale parent INDEX as it would have looked before the child
+        # was created (no mention of NEWBRANCH).
+        (vault_with_roles / "CREATIVE/INDEX.md").write_text(
+            "<!-- generated: do not edit -->\n# CREATIVE\n"
+            "**0 notes**\n## Folders\n- [[PHILOSOPHY]]\n",
+            encoding="utf-8")
+        (vault_with_roles / "CREATIVE/NEWBRANCH").mkdir(parents=True)
+
+        findings = maintain.run_census(vault_with_roles)
+        stale = [f for f in findings if f["check"] == "stale_index"]
+        assert stale, "expected a stale_index finding for CREATIVE"
+        assert any(f["path"] == "CREATIVE" for f in stale)
+        assert "NEWBRANCH" in stale[0]["detail"]
+
+    def test_census_stays_quiet_when_index_matches(self, vault_with_roles, roles):
+        # A correct, current INDEX must not raise a stale_index finding.
+        # Creating NEWBRANCH without regenerating leaves CREATIVE/INDEX.md
+        # stale (the original bug); the repair is regenerate_indexes, after
+        # which the census must be quiet.
+        from vault.generate import regenerate_indexes
+        (vault_with_roles / "CREATIVE/NEWBRANCH").mkdir(parents=True)
+        regenerate_indexes(vault_with_roles)
+        findings = maintain.run_census(vault_with_roles)
+        assert not any(f["check"] == "stale_index" for f in findings)
+
+
 class TestSuggestions:
     def test_suggestions_are_nature_suggestion(self, vault_with_roles):
         # two notes with identical normalised titles in the same tree

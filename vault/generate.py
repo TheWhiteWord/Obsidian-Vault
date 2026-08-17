@@ -22,6 +22,7 @@ from .constants import (
     GENERATED_MARKER,
     MARKDOWN_SUFFIX,
     SKIP_DIRS,
+    STATE_DIRNAME,
     SUMMARY_FIELD_KEY,
 )
 from .notes import Note, derive_tags, derive_vocabulary, iter_notes, parse_note
@@ -206,6 +207,55 @@ def write_index(vault_root: Path, folder: str) -> Optional[str]:
     _guard_overwrite(index_file)
     index_file.write_text(build_index(root, folder), encoding="utf-8")
     return relative_to_vault(root, index_file)
+
+
+def reindex_ancestors(vault_root: Path, folder: str) -> List[str]:
+    """Regenerate the INDEX of ``folder`` and every ancestor up to the root.
+
+    A new folder must be reflected in its parent's INDEX (the parent lists
+    its children); that parent's change must reach *its* parent, and so on
+    up to the vault root. No single write path regenerated ancestors before,
+    so creating a nested folder left every ancestor's INDEX stale — the
+    parent never listed the new child. This closes that gap for any creation
+    site (scaffold, domain bind, and future out-of-band paths) in one call.
+
+    Skips engine-reserved folders (``.vault``, ``.state``) as content trees:
+    they must never carry a content-derived INDEX of themselves.
+
+    Never raises: a derived view failing to regenerate must not fail the
+    caller's operation. The next regeneration repairs whatever was missed.
+    """
+    root = Path(vault_root).resolve()
+    target = safe_join(root, folder)
+    if not target.is_dir():
+        return []
+
+    rel = relative_to_vault(root, target)
+    # Folder itself, then each ancestor up to and including the root
+    # (empty string). The root INDEX lists top-level folders too, so it must
+    # be refreshed when a top-level folder appears.
+    if rel:
+        parts = Path(rel).parts
+        chain: List[str] = [rel] + [
+            str(Path(*parts[:i])) for i in range(len(parts) - 1, 0, -1)
+        ]
+        chain.append("")  # vault root
+    else:
+        chain = [""]
+
+    written: List[str] = []
+    for rel_folder in chain:
+        try:
+            target_dir = safe_join(root, rel_folder)
+            if CONFIG_DIRNAME in target_dir.parts or STATE_DIRNAME in target_dir.parts:
+                continue
+            path = write_index(root, rel_folder)
+            if path:
+                written.append(path)
+        except Exception:  # noqa: BLE001 — derived view; never fatal
+            logger.warning("ancestor index regeneration failed for %s",
+                           rel_folder, exc_info=True)
+    return written
 
 
 def regenerate_indexes(

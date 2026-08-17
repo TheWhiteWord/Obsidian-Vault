@@ -393,6 +393,36 @@ def test_bind_domain_full_flow(tmp_path):
                                     "work/recipes/note.md")
 
 
+def test_bind_domain_refreshes_parent_index(tmp_path):
+    """Creating a domain must appear in its parent's INDEX (work/).
+
+    Before the fix, role_bind regenerated no INDEX at all, so a freshly
+    bound domain was invisible in the README tree until a manual regen.
+    """
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "creative")
+
+    installer.role_bind(hermes, vault, "creative", domain="recipes")
+
+    work_idx = vault / "work" / "INDEX.md"
+    assert work_idx.is_file(), "work/INDEX.md must exist after a bind"
+    assert "[[recipes]]" in work_idx.read_text(encoding="utf-8")
+    # The domain's own INDEX is also generated.
+    assert (vault / "work" / "recipes" / "INDEX.md").is_file()
+
+
+def test_bind_system_tree_refreshes_root_index(tmp_path):
+    """Creating the system tree must appear in the root INDEX."""
+    hermes, vault = _scratch(tmp_path)
+    _bound_contributor(hermes, vault, "default")
+
+    installer.role_bind(hermes, vault, "default", system_tree=True)
+
+    root_idx = vault / "INDEX.md"
+    assert root_idx.is_file(), "root INDEX.md must exist after a bind"
+    assert "[[system]]" in root_idx.read_text(encoding="utf-8")
+
+
 def test_bind_system_tree_full_flow(tmp_path):
     """--system: creates the reserved tree + config and grants write/config
     over system/** — the standard preset's default block as a growth

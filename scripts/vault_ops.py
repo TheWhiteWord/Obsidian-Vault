@@ -2027,6 +2027,7 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         # `work`/parent container is reused, never shadow-created; the new
         # domain keeps the caller's spelling.
         from vault.paths import safe_join as _safe_join
+        from vault.generate import reindex_ancestors
         domain_dir = _safe_join(vault_root, f"work/{domain}")
         if not domain_dir.is_dir() and not dry_run:
             (domain_dir / ".vault").mkdir(parents=True, exist_ok=True)
@@ -2041,6 +2042,9 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
             else:
                 (domain_dir / ".vault" / "config.yaml").write_text(
                     _domain_config_stub(domain), encoding="utf-8")
+            # A new domain must appear in its parent's INDEX (work/), and
+            # that change must propagate to every ancestor up to the root.
+            reindex_ancestors(vault_root, f"work/{domain}")
         if dry_run:
             print(f"[dry-run] mkdir {domain_dir} + .vault/config.yaml")
         _append_agent_grant(roles_path, profile, domain, dry_run=dry_run)
@@ -2053,6 +2057,7 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
         # directory first.
         _validate_system_bind(roles_path, profile)
         from vault.paths import safe_join as _safe_join
+        from vault.generate import reindex_ancestors
         sys_dir = _safe_join(vault_root, "system")
         if not sys_dir.is_dir() and not dry_run:
             (sys_dir / ".vault").mkdir(parents=True, exist_ok=True)
@@ -2067,6 +2072,9 @@ def role_bind(hermes_home: Path, vault_root: Path, profile: str,
             else:
                 (sys_dir / ".vault" / "config.yaml").write_text(
                     _system_config_stub(), encoding="utf-8")
+            # A new system tree must appear in the root INDEX, and propagate
+            # upward (the root is the top, so this regenerates root + system).
+            reindex_ancestors(vault_root, "system")
         if dry_run:
             print(f"[dry-run] mkdir {sys_dir} + .vault/config.yaml")
         _append_system_grant(roles_path, profile, dry_run=dry_run)
