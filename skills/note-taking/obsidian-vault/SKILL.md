@@ -81,6 +81,17 @@ optionally per scope, loaded via `obsidian_conventions`.
 - If you created links, check `obsidian_graph` dangling output for breakage you
   introduced.
 
+## Path handling
+
+The vault root is `$OBSIDIAN_VAULT_PATH` (set in your profile `.env` at
+install — a user-chosen absolute path, which may differ per install). You
+do **not** reconstruct it. Every `obsidian_*` tool resolves it
+automatically, so pass **vault-relative** paths (`system/foo.md`,
+`work/graphic/video/h3/general_generation.md`) — never the absolute path,
+never a guessed parent folder. When you genuinely need the absolute path
+outside the tools (e.g. a raw `read_file`), read `$OBSIDIAN_VAULT_PATH`
+from the environment; do not hardcode it.
+
 ## Maintaining conventions
 
 Conventions live **in the vault, in-tree**: `.vault/conventions.md` at the

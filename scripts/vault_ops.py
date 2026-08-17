@@ -195,16 +195,25 @@ def _soul_block(role: str) -> str:
             "- For any task touching an Obsidian vault, load the "
             "`obsidian-vault` skill first — it holds the writing loop "
             "and the conventions.\n"
+            "- Vault root: `$OBSIDIAN_VAULT_PATH` (set in your `.env`). The "
+            "`obsidian_*` tools resolve it automatically — pass **vault-relative** "
+            "paths (`system/foo.md`); never reconstruct the absolute path.\n"
         ),
         "manager": (
             "- For any task touching an Obsidian vault, load the "
             "`obsidian-vault-management` skill first — it holds the "
             "sweep, triage, and growth flows.\n"
+            "- Vault root: `$OBSIDIAN_VAULT_PATH` (set in your `.env`). The "
+            "`obsidian_*` tools resolve it automatically — pass **vault-relative** "
+            "paths (`system/foo.md`); never reconstruct the absolute path.\n"
         ),
         "combined": (
             "- Author and maintain: load `obsidian-vault` for writing "
             "rules, `obsidian-vault-management` for the sweep and "
             "triage.\n"
+            "- Vault root: `$OBSIDIAN_VAULT_PATH` (set in your `.env`). The "
+            "`obsidian_*` tools resolve it automatically — pass **vault-relative** "
+            "paths (`system/foo.md`); never reconstruct the absolute path.\n"
         ),
     }
     issues = {
