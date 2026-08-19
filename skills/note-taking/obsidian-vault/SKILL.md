@@ -131,8 +131,14 @@ the user confirms, the tool and subcommands do the filesystem work — never
 hand-create folders or configs.
 
 1. `obsidian_scaffold` — propose the folder and its field delta (patterns in
-   `references/config-authoring.md`). The proposal shows what would change;
-   structural keys need user confirmation.
+   `references/config-authoring.md`). The proposal shows what would change.
+   A delta that changes what validates for future notes — a **new required
+   field**, or narrowing a vocabulary to `allowed_only` — is *structural*: the
+   tool refuses it on `confirm=true` alone, because that flag is the agent
+   saying "execute", not the human approving a schema change. After the user
+   confirms (e.g. via `clarify`), re-run with `user_confirmed: true` set
+   *inside* the `proposed` dict. See `references/tool-protocol.md`
+   (Structural-change confirmation).
 2. No registration step — your grant covers `work/<domain>/**`, so the new
    folder is inside your domain from birth, and conventions are already
    covered in-tree (the root file, or the scope's own). Only a genuinely

@@ -81,8 +81,12 @@ agent can *read* (that is grants, deny-by-default).
 ## 5. May / must not
 
 **May** (with the right grant):
-- `obsidian_scaffold` — new folder + config delta (write grant; structural keys need user confirmation).
-- `obsidian_edit_config` — edit an existing config (config grant; structural keys need user confirmation).
+- `obsidian_scaffold` — new folder + config delta (write grant). A delta with
+  new required fields or `allowed_only` narrowing is *structural* and is
+  refused unless you also pass `proposed.user_confirmed=true` (set only after
+  the human confirms, e.g. via `clarify`) — `confirm=true` alone is not enough.
+- `obsidian_edit_config` — edit an existing config (config grant). Same rule:
+  structural keys require `proposed.user_confirmed=true`.
 - `obsidian_reference` — self-documented options; `obsidian_context` — resolved view. Always check these first.
 
 **Must not:**

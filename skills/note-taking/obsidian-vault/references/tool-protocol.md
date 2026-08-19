@@ -31,6 +31,24 @@ never as an error.
   carries per-field errors with `did_you_mean` suggestions.
 - Responses are structured JSON — an actionable object, never a stack trace.
 
+## Structural-change confirmation
+
+Some config changes alter what validates for future notes — adding a required
+field, or narrowing a vocabulary to `allowed_only`. The engine will not apply
+these on the agent's own authority, even with `confirm=true`: `confirm` means
+"I am executing", not "the human approved a schema change".
+
+Two separate flags, by design (scaffold.py / edit_config.py `_user_confirmed`):
+
+- `confirm=true` — the agent authorizes the write to proceed.
+- `proposed.user_confirmed=true` — the agent asserts the *human* explicitly
+  approved this structural change (e.g. via the `clarify` tool).
+
+A structural delta is refused (`ScaffoldRefused`) unless **both** are true. Set
+`user_confirmed: true` *inside the `proposed` dict* — not as a top-level
+argument — and only after the user has actually confirmed. Vocabulary *values*
+(broadening `allowed`) are not structural and need neither flag.
+
 ## Enforcement order (writes)
 
 `safe_join` (path confinement) → grant check → schema validation → write.

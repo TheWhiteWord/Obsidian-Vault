@@ -23,7 +23,7 @@ satisfiable by `append`); `edit`/`delete` → `write`; `edit_meta` →
 
 | Tool | Purpose | Key parameters | Gate |
 |---|---|---|---|
-| `obsidian_scaffold` | Create a folder cheaply: returns a proposal of only what the folder needs **beyond inheritance**, writes nothing unless `confirm=true`. Structural config (new required fields) needs user confirmation; vocabulary values do not. Empty deltas write no config. | `path` (required); `intent`, `proposed`, `confirm` | `write` / `append` (create operation) |
+| `obsidian_scaffold` | Create a folder cheaply: returns a proposal of only what the folder needs **beyond inheritance**, writes nothing unless `confirm=true`. Structural config (new required fields, or `allowed_only` narrowing) needs `proposed.user_confirmed=true` *and* `confirm=true` — `confirm=true` alone is refused; vocabulary values need neither. Empty deltas write no config. | `path` (required); `intent`, `proposed`, `confirm` | `write` / `append` (create operation) |
 | `obsidian_edit_config` | Edit an existing `.vault/config.yaml` — the config-gated sibling of scaffold. Same delta semantics; structural changes need `proposed.user_confirmed: true`. Never edits `roles.yaml`; refuses uniformity violations (redefining `format`/`multi`). | `path`, `proposed` (required); `confirm` | `config` |
 | `obsidian_conventions` | Read or edit the in-tree scope directives. Read mode (`folder`): the resolved conventions chain — nearest file plus fallbacks. Edit mode (`path` ending in `.vault/conventions.md` + `content`): only the derived owner of the scope may write; the manager never writes conventions. | `folder` — or `path` + `content` | read: any agent; edit: `write` over the scope |
 
